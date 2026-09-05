@@ -36,7 +36,7 @@ BUILD
 
 | Lesson | Focus Area | Canonical Proof | Base Revision |
 |---|---|---|---|
-| [Building a Tiny Game](file:///docs/learn/BUILDING_A_TINY_GAME.md) | Foundational 2D Gameplay, Transforms, Clock, Input, Collision, State, Rules, Kiln Seam, DOM UI | **Proof A (Pong)** | `2c73c29450ed2412638a334bd90fb8919c1220a0` |
+| [Building a Tiny Game](./BUILDING_A_TINY_GAME.md) | Foundational 2D Gameplay, Transforms, Clock, Input, Collision, State, Rules, Kiln Seam, DOM UI | **Proof A (Pong)** | `2c73c29450ed2412638a334bd90fb8919c1220a0` |
 
 ---
 
