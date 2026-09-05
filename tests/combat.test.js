@@ -241,6 +241,8 @@ test('Combat Room — ArenaCombatGame Coordinator & Lifecycle', async (t) => {
     assert.equal(game.enemy.hp, 100);
     assert.equal(game.combatStats.playerHitsLanded, 0);
     assert.equal(game.player.transform.position.z, -4.5);
+    assert.equal(game.enemy.character.rootBone.rotation.x, 0, 'enemy rootBone rotation.x reset to 0');
+    assert.equal(game.enemy.character.rootBone.position.y, 0, 'enemy rootBone position.y reset to 0');
   });
 
   await t.test('player moves forward through real input/action simulation and authoritative integration', () => {
@@ -281,8 +283,8 @@ test('Combat Room — ArenaCombatGame Coordinator & Lifecycle', async (t) => {
     const startX = game.player.transform.position.x;
     const startZ = game.player.transform.position.z;
 
-    // 1. Stick forward (axes[1] = -0.85 < -0.25) -> MoveForward
-    pad.axes[1] = -0.85;
+    // 1. Stick down / south (axes[1] = +0.85 > +0.25) -> MoveForward (moves down on screen towards enemy)
+    pad.axes[1] = 0.85;
     for (let i = 0; i < 40; i++) {
       game.update(0.016);
     }
@@ -292,7 +294,7 @@ test('Combat Room — ArenaCombatGame Coordinator & Lifecycle', async (t) => {
     }
 
     const midZ = game.player.transform.position.z;
-    assert.ok(midZ > startZ + 1.0, `Player must advance forward via gamepad stick (start: ${startZ}, mid: ${midZ})`);
+    assert.ok(midZ > startZ + 1.0, `Player must advance towards enemy via gamepad stick (start: ${startZ}, mid: ${midZ})`);
 
     // 2. Stick right (axes[0] = +0.85 > +0.25) -> MoveRight
     pad.axes[0] = 0.85;

@@ -68,12 +68,17 @@ export class ArenaCombatGame {
   }
 
   _configureDefaultInputBindings() {
-    this.input.bindKey('KeyW', 'MoveForward');
-    this.input.bindKey('KeyS', 'MoveBackward');
+    // Screen-space mapped controls (camera at +Z looking towards -Z):
+    // Up / W: moves UP on screen (away from camera, -Z) -> MoveBackward
+    // Down / S: moves DOWN on screen (towards camera / towards enemy, +Z) -> MoveForward
+    // Left / A: moves LEFT on screen (-X) -> MoveLeft
+    // Right / D: moves RIGHT on screen (+X) -> MoveRight
+    this.input.bindKey('KeyW', 'MoveBackward');
+    this.input.bindKey('KeyS', 'MoveForward');
     this.input.bindKey('KeyA', 'MoveLeft');
     this.input.bindKey('KeyD', 'MoveRight');
-    this.input.bindKey('ArrowUp', 'MoveForward');
-    this.input.bindKey('ArrowDown', 'MoveBackward');
+    this.input.bindKey('ArrowUp', 'MoveBackward');
+    this.input.bindKey('ArrowDown', 'MoveForward');
     this.input.bindKey('ArrowLeft', 'MoveLeft');
     this.input.bindKey('ArrowRight', 'MoveRight');
     this.input.bindKey('Space', 'Attack');
@@ -81,20 +86,21 @@ export class ArenaCombatGame {
     this.input.bindKey('KeyR', 'Reset');
 
     if (typeof this.input.bindGamepadButton === 'function') {
-      this.input.bindGamepadButton(0, 'Attack');       // Button South / A / Cross
-      this.input.bindGamepadButton(3, 'Reset');        // Button North / Y / Triangle
-      this.input.bindGamepadButton(8, 'Reset');        // Back / View / Select
-      this.input.bindGamepadButton(12, 'MoveForward'); // D-pad Up
-      this.input.bindGamepadButton(13, 'MoveBackward');// D-pad Down
-      this.input.bindGamepadButton(14, 'MoveLeft');    // D-pad Left
-      this.input.bindGamepadButton(15, 'MoveRight');   // D-pad Right
+      this.input.bindGamepadButton(0, 'Attack');        // Button South / A / Cross
+      this.input.bindGamepadButton(3, 'Reset');         // Button North / Y / Triangle
+      this.input.bindGamepadButton(8, 'Reset');         // Back / View / Select
+      this.input.bindGamepadButton(12, 'MoveBackward'); // D-pad Up -> moves UP on screen
+      this.input.bindGamepadButton(13, 'MoveForward');  // D-pad Down -> moves DOWN on screen
+      this.input.bindGamepadButton(14, 'MoveLeft');     // D-pad Left -> moves LEFT on screen
+      this.input.bindGamepadButton(15, 'MoveRight');    // D-pad Right -> moves RIGHT on screen
     }
 
     if (typeof this.input.bindGamepadAxis === 'function') {
       // Left Stick X (axis 0): negative -> MoveLeft, positive -> MoveRight
       this.input.bindGamepadAxis(0, 'MoveLeft', 'MoveRight', { deadzone: 0.25 });
-      // Left Stick Y (axis 1): negative -> MoveForward, positive -> MoveBackward
-      this.input.bindGamepadAxis(1, 'MoveForward', 'MoveBackward', { deadzone: 0.25 });
+      // Left Stick Y (axis 1): negative (pushed forward/up) -> MoveBackward (moves UP on screen),
+      //                        positive (pushed backward/down) -> MoveForward (moves DOWN on screen)
+      this.input.bindGamepadAxis(1, 'MoveBackward', 'MoveForward', { deadzone: 0.25 });
     }
   }
 
@@ -197,6 +203,15 @@ export class ArenaCombatGame {
     this.combatStats.totalDamageTaken = 0;
     this.combatStats.lastAttackVolume = null;
     this.combatStats.lastHitPoint = null;
+
+    if (this.enemy.character?.rootBone) {
+      this.enemy.character.rootBone.rotation.x = 0;
+      this.enemy.character.rootBone.position.y = 0;
+    }
+    if (this.player.character?.rootBone) {
+      this.player.character.rootBone.rotation.x = 0;
+      this.player.character.rootBone.position.y = 0;
+    }
 
     this._syncMeshTransforms();
 
@@ -405,10 +420,15 @@ export class ArenaCombatGame {
       applyProceduralAttackPose(this.enemy.character, this.enemy.attackTimer);
     }
 
-    // Death collapse: if enemy dead, tilt body to floor
-    if (this.enemy.aiState === ENEMY_AI_STATES.DEAD && this.enemy.character.rootBone) {
-      this.enemy.character.rootBone.rotation.x = -Math.PI / 2;
-      this.enemy.character.rootBone.position.y = 0.20;
+    // Death collapse: if enemy dead, tilt body to floor; otherwise maintain upright root bone
+    if (this.enemy.character?.rootBone) {
+      if (this.enemy.aiState === ENEMY_AI_STATES.DEAD) {
+        this.enemy.character.rootBone.rotation.x = -Math.PI / 2;
+        this.enemy.character.rootBone.position.y = 0.20;
+      } else {
+        this.enemy.character.rootBone.rotation.x = 0;
+        this.enemy.character.rootBone.position.y = 0;
+      }
     }
   }
 
