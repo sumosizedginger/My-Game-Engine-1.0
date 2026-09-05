@@ -72,6 +72,11 @@ export function createB2Viewer({ container, isControlled = false }) {
 
   window.__PROOF_B2_COMBAT__ = b2Bridge;
 
+  // Attach input listener in browser environment
+  if (typeof window !== 'undefined' && game.input?.attach) {
+    game.input.attach(window);
+  }
+
   // 5. HUD update logic
   function updateHUD() {
     const snap = game.getStateSnapshot();
@@ -130,17 +135,28 @@ export function createB2Viewer({ container, isControlled = false }) {
     }
   }
 
-  // 6. Game Loop
+  // 6. Window Resize Handler
+  function onResize() {
+    renderer.resize();
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', onResize);
+  }
+
+  // 7. Initial render (ensures scene is drawn immediately)
+  renderer.render();
+  updateHUD();
+
+  // 8. Game Loop
   function loop(currentTime) {
     if (!running) return;
     const delta = Math.min(currentTime - lastTime, 100);
     lastTime = currentTime;
 
-    // Advance clock accumulator
-    game.clock.advance(delta);
-    while (game.clock.shouldStep()) {
-      game.update(game.clock.fixedDelta);
-    }
+    // Advance clock accumulator with fixed simulation callback
+    game.clock.advance(delta, (fixedDelta) => {
+      game.update(fixedDelta);
+    });
 
     renderer.render();
     updateHUD();
@@ -150,16 +166,18 @@ export function createB2Viewer({ container, isControlled = false }) {
 
   if (running) {
     animationFrameId = requestAnimationFrame(loop);
-  } else {
-    // Initial render for controlled fixture
-    renderer.render();
-    updateHUD();
   }
 
   function destroy() {
     running = false;
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
+    }
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('resize', onResize);
+      if (game.input?.detach) {
+        game.input.detach(window);
+      }
     }
     renderer.destroy();
     if (window.__PROOF_B2_COMBAT__ === b2Bridge) {
