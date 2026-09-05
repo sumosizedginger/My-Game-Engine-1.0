@@ -109,6 +109,11 @@ Location:
 
 `docs/learn/`
 
+Entry points:
+
+- `docs/learn/README.md`
+- `docs/learn/BUILDING_A_TINY_GAME.md`
+
 Learning documents do not override canonical architecture.
 
 ## ADR
@@ -348,6 +353,9 @@ Relevant concerns:
 
 Operational note:
 See `TESTING_AND_VALIDATION.md` §22.1 for evaluation harness operations covering Proof A targets, checks (`pongBoot`, `pongGameplay`, `pongScoring`), and capture fixtures.
+
+Learning note:
+See `docs/learn/BUILDING_A_TINY_GAME.md` for the accepted learning extraction and architecture walkthrough of Proof A.
 
 Do not import later character/world complexity.
 
