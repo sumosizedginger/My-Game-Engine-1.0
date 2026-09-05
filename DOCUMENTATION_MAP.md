@@ -113,6 +113,7 @@ Entry points:
 
 - `docs/learn/README.md`
 - `docs/learn/BUILDING_A_TINY_GAME.md`
+- `docs/learn/BUILDING_A_WALKING_CHARACTER.md`
 
 Learning documents do not override canonical architecture.
 
@@ -397,6 +398,9 @@ Relevant concerns:
 
 Operational note:
 See `TESTING_AND_VALIDATION.md` §22.1 for evaluation harness operations covering Proof B1 targets (`?proof=b1&controlled=1`), checks (`b1Boot`, `b1CharacterGeneration`, `b1MotionExecution`, `b1GroundingCheck`), and capture fixtures (`artifacts/captures/proof_b1_motion_fixture.png`).
+
+Learning note:
+See `docs/learn/BUILDING_A_WALKING_CHARACTER.md` for the accepted B1 learning extraction and architecture walkthrough.
 
 Do not hide failed motion behind unrelated effects or environments.
 

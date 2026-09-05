@@ -37,6 +37,7 @@ BUILD
 | Lesson | Focus Area | Canonical Proof | Base Revision |
 |---|---|---|---|
 | [Building a Tiny Game](./BUILDING_A_TINY_GAME.md) | Foundational 2D Gameplay, Transforms, Clock, Input, Collision, State, Rules, Kiln Seam, DOM UI | **Proof A (Pong)** | `2c73c29450ed2412638a334bd90fb8919c1220a0` |
+| [Building a Walking Character](./BUILDING_A_WALKING_CHARACTER.md) | Procedural Humanoid Synthesis, Landmarks, 22-Bone Skeleton, Normalized Skinning, 2-Bone IK, Realized Grounding, Pelvis Dynamics | **Proof B1 (Motion Truth)** | `52eb3b3c91d725e9a73ebb1ea658b393a12029b4` |
 
 ---
 
@@ -48,10 +49,10 @@ To run and inspect the implementation taught in these guides:
 # Clean dependency installation
 npm ci
 
-# Run the complete automated test suite (44 unit tests)
+# Run the complete automated test suite (70 unit tests)
 npm test
 
-# Run the headless browser evaluation harness (dual-target validation + captures)
+# Run the headless browser evaluation harness (three-target validation + captures)
 npm run eval
 
 # Build the static production bundle
@@ -65,3 +66,5 @@ Interactive URLs on the local development server (`http://localhost:5173/`):
 - **Phase 0 Controlled Boot Proof**: `http://localhost:5173/?controlled=1`
 - **Proof A Pong Game**: `http://localhost:5173/?game=pong`
 - **Proof A Pong Controlled Fixture**: `http://localhost:5173/?game=pong&controlled=1`
+- **Proof B1 Motion Studio**: `http://localhost:5173/?proof=b1`
+- **Proof B1 Motion Controlled Fixture**: `http://localhost:5173/?proof=b1&controlled=1`
