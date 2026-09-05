@@ -19,15 +19,110 @@ import {
 import { createEngineFull, ENTRY_POINT as FULL_ENTRY_POINT } from '../full/index.js';
 import { createPongGame } from '../games/pong/index.js';
 import { createB1Viewer } from './b1-viewer.js';
+import { createB2Viewer } from './b2-viewer.js';
 
 const params = new URLSearchParams(window.location.search);
+const isB2Mode = params.get('proof') === 'b2';
 const isB1Mode = params.get('proof') === 'b1';
 const isPongMode = params.get('game') === 'pong';
 const isControlled = params.has('controlled');
 
 const app = document.getElementById('app');
 
-if (isB1Mode) {
+if (isB2Mode) {
+  // ==========================================
+  // PROOF B2: PROCEDURAL COMBAT ROOM
+  // ==========================================
+  if (app) {
+    app.innerHTML = `
+      <div style="display: flex; flex-direction: column; align-items: center; max-width: 960px; width: 100%; margin: 16px auto; padding: 0 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-sizing: border-box;">
+        <!-- Top Navigation -->
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 12px;">
+          <div>
+            <span style="font-size: 18px; font-weight: 700; color: #38bdf8;">${ENGINE_NAME}</span>
+            <span style="font-size: 13px; color: #94a3b8; margin-left: 8px;">Proof B2 — Procedural Combat Room</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <a href="/?proof=b2" style="font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 6px; background: #0284c7; color: #ffffff; text-decoration: none; border: 1px solid #0284c7;">Combat Room</a>
+            <a href="/?proof=b1" style="font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Proof B1 (Motion)</a>
+            <a href="/?game=pong" style="font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Proof A (Pong)</a>
+            <a href="/?proof=phase0" style="font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Phase 0 Boot</a>
+          </div>
+        </div>
+
+        <!-- Combat Status Banner & HUD -->
+        <div style="display: flex; flex-direction: column; width: 100%; gap: 8px; margin-bottom: 12px;">
+          <div id="b2-status-banner" style="width: 100%; padding: 8px 16px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; font-size: 13px; font-weight: 700; color: #38bdf8; text-align: center; box-sizing: border-box;">
+            READY — APPROACH ENEMY TO ENGAGE
+          </div>
+
+          <!-- Health Bars -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%;">
+            <!-- Player Health -->
+            <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 8px 12px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <span style="color: #60a5fa; font-weight: 600;">PLAYER (Athletic Blue)</span>
+                <span id="b2-player-hp-text" style="color: #cbd5e1; font-weight: 600;">100 / 100</span>
+              </div>
+              <div style="width: 100%; height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden;">
+                <div id="b2-player-hp-bar" style="width: 100%; height: 100%; background: #3b82f6; transition: width 0.15s ease-out;"></div>
+              </div>
+            </div>
+
+            <!-- Enemy Health -->
+            <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 8px 12px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px;">
+                <span style="color: #f87171; font-weight: 600;">ENEMY BRUTE (Heavy Crimson)</span>
+                <span id="b2-enemy-hp-text" style="color: #cbd5e1; font-weight: 600;">100 / 100</span>
+              </div>
+              <div style="width: 100%; height: 10px; background: #1e293b; border-radius: 5px; overflow: hidden;">
+                <div id="b2-enemy-hp-bar" style="width: 100%; height: 100%; background: #ef4444; transition: width 0.15s ease-out;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3D Canvas Container -->
+        <div id="b2-canvas-container" style="position: relative; width: 100%; height: 500px; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7); border: 2px solid #1e293b; background: #10141c;"></div>
+
+        <!-- Telemetry & Semantics Bar -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; width: 100%; margin-top: 10px;">
+          <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 6px 10px; font-size: 11px;">
+            <span style="color: #64748b;">Combat:</span> <span id="b2-stat-hits" style="color: #4ade80; font-weight: 600;">Hits: 0 | Dmg: 0</span>
+          </div>
+          <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 6px 10px; font-size: 11px;">
+            <span style="color: #64748b;">Enemy AI:</span> <span id="b2-stat-enemy-state" style="color: #facc15; font-weight: 600;">AI: IDLE</span>
+          </div>
+          <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 6px 10px; font-size: 11px;">
+            <span style="color: #64748b;">Geometry:</span> <span style="color: #38bdf8; font-weight: 600;">16x16m Arena (2 Pillars)</span>
+          </div>
+          <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 6px 10px; font-size: 11px;">
+            <span style="color: #64748b;">Hit Authority:</span> <span style="color: #a78bfa; font-weight: 600;">Single Volume Contract</span>
+          </div>
+        </div>
+
+        <!-- Controls Guide -->
+        <div style="margin-top: 10px; padding: 8px 16px; background: #0b1120; border: 1px solid #1e293b; border-radius: 6px; font-size: 11px; color: #94a3b8; text-align: center; width: 100%; box-sizing: border-box;">
+          <span style="color: #38bdf8; font-weight: 600;">Controls:</span>
+          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">W</kbd>
+          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">A</kbd>
+          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">S</kbd>
+          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">D</kbd> or Arrows to Move •
+          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">Space</kbd> / <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">J</kbd> to Strike •
+          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">R</kbd> to Reset
+        </div>
+
+        <div id="proof-b2-fixture-tag" style="margin-top: 6px; font-size: 11px; color: #475569;">
+          ${isControlled ? 'PROOF_B2_CONTROLLED_FIXTURE' : `Active Combat Loop (${ENGINE_VERSION})`}
+        </div>
+      </div>
+    `;
+
+    const container = document.getElementById('b2-canvas-container');
+    createB2Viewer({ container, isControlled });
+    console.log('[My Game Engine 1.0] Proof B2 Combat Room initialized');
+  }
+} else if (isB1Mode) {
   // ==========================================
   // PROOF B1: MOTION TRUTH
   // ==========================================
@@ -41,6 +136,7 @@ if (isB1Mode) {
             <span style="font-size: 13px; color: #94a3b8; margin-left: 8px;">Proof B1 — Motion Truth</span>
           </div>
           <div style="display: flex; gap: 8px;">
+            <a href="/?proof=b2" style="font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Proof B2 (Combat)</a>
             <a href="/?proof=b1" style="font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 6px; background: #0284c7; color: #ffffff; text-decoration: none; border: 1px solid #0284c7;">Motion Studio</a>
             <a href="/?game=pong" style="font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Proof A (Pong)</a>
             <a href="/?proof=phase0" style="font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Phase 0 Boot</a>
@@ -178,6 +274,7 @@ if (isB1Mode) {
             <span style="font-size: 13px; color: #94a3b8; margin-left: 8px;">Proof A — Tiny Complete Game</span>
           </div>
           <div style="display: flex; gap: 8px;">
+            <a href="/?proof=b2" style="font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Proof B2 (Combat)</a>
             <a href="/?proof=b1" style="font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Proof B1 (Motion)</a>
             <a href="/?game=pong" style="font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 6px; background: #0284c7; color: #ffffff; text-decoration: none; border: 1px solid #0284c7;">Pong Court</a>
             <a href="/?proof=phase0" style="font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Phase 0 Boot</a>
@@ -282,6 +379,7 @@ if (isB1Mode) {
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; border-bottom: 1px solid #334155; padding-bottom: 16px;">
           <h1 id="engine-title" style="margin: 0; font-size: 24px; font-weight: 700; color: #38bdf8;">${results.engineName}</h1>
           <div style="display: flex; align-items: center; gap: 8px;">
+            <a href="/?proof=b2" style="font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Proof B2 (Combat)</a>
             <a href="/?proof=b1" style="font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Proof B1 (Motion)</a>
             <a href="/?game=pong" style="font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 6px; background: #0284c7; color: #ffffff; text-decoration: none;">Launch Proof A (Pong)</a>
             <span id="boot-status" style="font-size: 14px; font-weight: 700; padding: 4px 12px; border-radius: 9999px; background: ${isPass ? '#166534' : '#991b1b'}; color: ${isPass ? '#4ade80' : '#f87171'};">

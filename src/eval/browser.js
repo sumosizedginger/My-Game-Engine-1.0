@@ -99,7 +99,9 @@ export function runBrowserEvaluation({
 
       // Wait for engine module initialization based on target URL
       try {
-        if (url.includes('proof=b1')) {
+        if (url.includes('proof=b2')) {
+          await page.waitForFunction(() => Boolean(window.__PROOF_B2_COMBAT__), { timeout: 6000 });
+        } else if (url.includes('proof=b1')) {
           await page.waitForFunction(() => Boolean(window.__PROOF_B1_MOTION__), { timeout: 6000 });
         } else if (url.includes('game=pong')) {
           await page.waitForFunction(() => Boolean(window.__PROOF_A_PONG__), { timeout: 6000 });
@@ -127,7 +129,11 @@ export function runBrowserEvaluation({
         const b1Phase = document.getElementById('b1-stat-phase')?.textContent?.trim() || '';
         const b1Speed = document.getElementById('b1-stat-speed')?.textContent?.trim() || '';
         const b1Contact = document.getElementById('b1-stat-contact')?.textContent?.trim() || '';
-        return { engineTitle, bootStatus, repoId, toolchainLabel, matchStatusBadge, p1Score, p2Score, b1Phase, b1Speed, b1Contact };
+        const b2Banner = document.getElementById('b2-status-banner')?.textContent?.trim() || '';
+        const b2PlayerHp = document.getElementById('b2-player-hp-text')?.textContent?.trim() || '';
+        const b2EnemyHp = document.getElementById('b2-enemy-hp-text')?.textContent?.trim() || '';
+        const b2Hits = document.getElementById('b2-stat-hits')?.textContent?.trim() || '';
+        return { engineTitle, bootStatus, repoId, toolchainLabel, matchStatusBadge, p1Score, p2Score, b1Phase, b1Speed, b1Contact, b2Banner, b2PlayerHp, b2EnemyHp, b2Hits };
       });
 
       // Capture deterministic baseline screenshot
@@ -313,12 +319,111 @@ export function runBrowserEvaluation({
         });
       }
 
+      // If evaluating Proof B2 Combat Room, run in-browser gameplay, collision, and combat evaluation
+      let b2Proof = null;
+      if (url.includes('proof=b2')) {
+        b2Proof = await page.evaluate(() => {
+          try {
+            if (!window.__PROOF_B2_COMBAT__) {
+              return { success: false, error: 'window.__PROOF_B2_COMBAT__ not found' };
+            }
+            const b2 = window.__PROOF_B2_COMBAT__;
+            const initial = b2.getStateSnapshot();
+
+            // 1. Initial generation checks (Room geometry, materials, character skeletons)
+            const hasRoomGeometry = b2.hasRoomGeometry && b2.vertexCount > 50 && b2.triangleCount > 50;
+            const hasMaterials = b2.hasMaterials;
+            const hasCharacters = b2.hasCharacters;
+
+            // 2. Controlled movement towards enemy
+            // Player starts at Z = -4.5, Enemy at Z = +4.5. Advance player along +Z into melee range
+            b2.setPlayerVelocity(0, 3.2);
+            for (let i = 0; i < 70; i++) {
+              b2.step(25);
+            }
+            b2.setPlayerVelocity(0, 0);
+
+            const movedSnapshot = b2.getStateSnapshot();
+            const playerMovedForward = movedSnapshot.player.position.z > initial.player.position.z;
+
+            // 3. Controlled Combat Strike & Single Hit Authority Resolution
+            b2.triggerAttack();
+            let fistSampleCoherent = false;
+
+            for (let i = 0; i < 30; i++) {
+              b2.step(25);
+              const snap = b2.getStateSnapshot();
+              if (snap.combatStats.lastFistCoherence && snap.combatStats.lastFistCoherence.coherent) {
+                fistSampleCoherent = true;
+              }
+            }
+
+            // 4. Repeated strikes to confirm damage accumulation and victory state transition
+            let victoryAchieved = false;
+            for (let round = 0; round < 6; round++) {
+              b2.triggerAttack();
+              for (let i = 0; i < 35; i++) {
+                b2.step(25);
+                const s = b2.getStateSnapshot();
+                if (s.state === 'VICTORY' || s.enemy.hp <= 0) {
+                  victoryAchieved = true;
+                  break;
+                }
+              }
+              if (victoryAchieved) break;
+            }
+
+            const finalSnap = b2.getStateSnapshot();
+            const hitsLanded = finalSnap.combatStats.playerHitsLanded > 0;
+            const damageDealt = finalSnap.combatStats.totalDamageDealt > 0;
+
+            const allPassed = Boolean(
+              hasRoomGeometry &&
+              hasMaterials &&
+              hasCharacters &&
+              playerMovedForward &&
+              hitsLanded &&
+              damageDealt &&
+              victoryAchieved
+            );
+
+            return {
+              success: allPassed,
+              checks: {
+                b2Boot: Boolean(b2.game && b2.renderer),
+                b2RoomGeneration: hasRoomGeometry,
+                b2MaterialGeneration: hasMaterials,
+                b2CharacterIntegration: hasCharacters,
+                b2CombatExecution: hitsLanded && damageDealt,
+                b2WinState: victoryAchieved,
+                playerMovedForward,
+                fistSampleCoherent,
+                vertexCount: b2.vertexCount,
+                triangleCount: b2.triangleCount,
+                hitsLanded: finalSnap.combatStats.playerHitsLanded,
+                totalDamage: finalSnap.combatStats.totalDamageDealt,
+                finalState: finalSnap.state,
+                enemyHp: finalSnap.enemy.hp
+              },
+              diagnosticsRecords: b2.game.diagnostics
+            };
+          } catch (evalErr) {
+            return {
+              success: false,
+              evalError: evalErr.message,
+              stack: evalErr.stack
+            };
+          }
+        });
+      }
+
       return {
         url,
         httpStatus,
         bootProof,
         pongProof,
         b1Proof,
+        b2Proof,
         domDetails,
         consoleErrors,
         consoleWarnings,

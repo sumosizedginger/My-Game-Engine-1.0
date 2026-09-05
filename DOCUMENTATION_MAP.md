@@ -200,10 +200,10 @@ Potential durable subsystem specifications:
 
 ```text
 GAMEPLAY_FOUNDATION.md (Earned by Proof A)
-GEOMETRY_FORGE.md
+GEOMETRY_FORGE.md (Earned by Proof B2)
 CHARACTER_FORGE.md (Earned by Proof B1)
 MOTION_FORGE.md (Earned by Proof B1)
-MATERIAL_FORGE.md
+MATERIAL_FORGE.md (Earned by Proof B2)
 WORLD_FORGE.md
 AUDIO_AND_FX.md
 PERFORMANCE_AND_PROFILING.md
@@ -440,6 +440,9 @@ Relevant concerns:
 - combat;
 - audio/FX hooks if required;
 - browser/runtime evidence.
+
+Operational note:
+See `TESTING_AND_VALIDATION.md` §22.1 for evaluation harness operations covering Proof B2 targets (`?proof=b2&controlled=1`), checks (`b2Boot`, `b2RoomGeneration`, `b2MaterialGeneration`, `b2CharacterIntegration`, `b2CombatExecution`, `b2WinState`), and capture fixtures (`artifacts/captures/proof_b2_combat_fixture.png`).
 
 Use direct procedural construction when simpler than CSG.
 

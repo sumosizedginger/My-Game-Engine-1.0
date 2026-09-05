@@ -587,7 +587,7 @@ The evaluation harness (`src/eval/*`) provides automated, headless real-browser 
   - Exit code `0` = PASS (all checks passed with zero fatal/error diagnostics).
   - Exit code `1` = FAIL (one or more checks failed or fatal errors encountered).
   - Executes headless real-browser validation (`puppeteer-core`).
-- **Default Suite Targets**: By default, `npm run eval` executes the full three-target evaluation suite:
+- **Default Suite Targets**: By default, `npm run eval` executes the full four-target evaluation suite:
   1. **Phase 0 Controlled Boot Proof**:
      - URL: `http://localhost:5173/?controlled=1`
      - Evaluates foundational engine boot and purity checks (`boot`, `runtimeMode`, `fullEngineSeam`, `purity`, `noConsoleErrors`, `noPageErrors`, `noFailedRequests`, `domStatusPass`).
@@ -607,10 +607,21 @@ The evaluation harness (`src/eval/*`) provides automated, headless real-browser 
        - `b1MotionExecution`: Verifies locomotion simulation clock stepping, double-frequency vertical bounce, lateral sway, and counter-phase arm swing.
        - `b1GroundingCheck`: Verifies multi-frame realized rendered foot bone heights (`foot_l`, `foot_r`) directly from the armature: guarantees zero ground penetration ($Y \ge \text{footH} - 0.001\text{ m}$) and bounded stance float ($Y \le \text{footH} + 0.025\text{ m}$, mean $\le 10\text{ mm}$).
      - Produces motion capture fixture: `artifacts/captures/proof_b1_motion_fixture.png`.
+  4. **Proof B2 Combat Room Controlled Fixture**:
+     - URL: `http://localhost:5173/?proof=b2&controlled=1`
+     - Evaluates integrated procedural room geometry, compiled PBR materials, multi-character locomotion, single-writer transform authority, single authoritative combat hit resolution, and victory lifecycle state transitions:
+       - `b2Boot`: Verifies HTTP 200, game coordinator and renderer initialization, and evaluation bridge exposure (`window.__PROOF_B2_COMBAT__`).
+       - `b2RoomGeneration`: Verifies procedural room synthesis from `RoomDefinition`, semantic vertex attributes (`regionId`, `surfaceId`), and synchronized collision bounds.
+       - `b2MaterialGeneration`: Verifies Material Forge compiler seam producing Three.js PBR materials with provenance.
+       - `b2CharacterIntegration`: Verifies multiple distinct SkinnedMesh characters (`athletic` player, `heavy` enemy) instantiated in room.
+       - `b2CombatExecution`: Verifies single authoritative attack volume evaluation, active strike window timing, hit registration, and damage application.
+       - `b2WinState`: Verifies enemy HP reduction to 0 and transition to terminal `VICTORY` state.
+     - Produces combat capture fixture: `artifacts/captures/proof_b2_combat_fixture.png`.
 - **Capture Fixtures**:
   - `artifacts/captures/phase0_boot_fixture.png` (Phase 0 boot proof)
   - `artifacts/captures/proof_a_pong_fixture.png` (Proof A Pong game)
   - `artifacts/captures/proof_b1_motion_fixture.png` (Proof B1 Motion truth)
+  - `artifacts/captures/proof_b2_combat_fixture.png` (Proof B2 Combat room)
   - Captures record SHA-256 integrity hash, byte size, viewport dimensions (default 1280x720), format, and git revision metadata.
 - **Single-Target / Custom Evaluation**:
   - The programmatic harness (`runEvaluation({ url, captureName })`) supports single-target evaluation if a custom target URL or capture name is specified.

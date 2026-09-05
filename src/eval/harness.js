@@ -142,7 +142,8 @@ export async function runEvaluation(options = {}) {
     if (browserResult.screenshotBuffer) {
       let capName = options.captureName;
       if (!capName) {
-        if (phase0Url.includes('proof=b1')) capName = 'proof_b1_motion_fixture';
+        if (phase0Url.includes('proof=b2')) capName = 'proof_b2_combat_fixture';
+        else if (phase0Url.includes('proof=b1')) capName = 'proof_b1_motion_fixture';
         else if (phase0Url.includes('game=pong')) capName = 'proof_a_pong_fixture';
         else capName = 'phase0_boot_fixture';
       }
@@ -151,7 +152,7 @@ export async function runEvaluation(options = {}) {
 
     // Baseline checks
     const checks = {
-      boot: browserResult.httpStatus === 200 && (Boolean(browserResult.bootProof) || Boolean(browserResult.pongProof) || Boolean(browserResult.b1Proof)),
+      boot: browserResult.httpStatus === 200 && (Boolean(browserResult.bootProof) || Boolean(browserResult.pongProof) || Boolean(browserResult.b1Proof) || Boolean(browserResult.b2Proof)),
       runtimeMode: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.runtimeBoot) : true,
       fullEngineSeam: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.fullEngineSeam) : true,
       purity: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.purityCheck) : true,
@@ -172,8 +173,9 @@ export async function runEvaluation(options = {}) {
 
     let pongResult = null;
     let b1Result = null;
+    let b2Result = null;
 
-    // 4. If running standard full suite, evaluate Proof A Pong AND Proof B1 Motion
+    // 4. If running standard full suite, evaluate Proof A Pong, Proof B1 Motion, AND Proof B2 Combat
     if (!isCustomSingleTarget) {
       // 4a. Proof A Pong
       const pongUrl = 'http://localhost:5173/?game=pong&controlled=1';
@@ -231,6 +233,47 @@ export async function runEvaluation(options = {}) {
       if (b1Result.b1Proof?.diagnosticsRecords) {
         rawDiagnostics.push(...b1Result.b1Proof.diagnosticsRecords);
       }
+
+      // 4c. Proof B2 Combat Room
+      const b2Url = 'http://localhost:5173/?proof=b2&controlled=1';
+      b2Result = await runBrowserEvaluation({
+        url: b2Url,
+        viewport,
+        captureScreenshot: true
+      });
+
+      if (b2Result.screenshotBuffer) {
+        captures.push(saveCapture(outputDir, 'proof_b2_combat_fixture', revision.commit, viewport, b2Result.screenshotBuffer));
+      }
+
+      checks.b2Boot = b2Result.httpStatus === 200 && Boolean(b2Result.b2Proof);
+      checks.b2RoomGeneration = Boolean(b2Result.b2Proof?.checks?.b2RoomGeneration);
+      checks.b2MaterialGeneration = Boolean(b2Result.b2Proof?.checks?.b2MaterialGeneration);
+      checks.b2CharacterIntegration = Boolean(b2Result.b2Proof?.checks?.b2CharacterIntegration);
+      checks.b2CombatExecution = Boolean(b2Result.b2Proof?.checks?.b2CombatExecution);
+      checks.b2WinState = Boolean(b2Result.b2Proof?.checks?.b2WinState);
+
+      if (b2Result.consoleErrors.length > 0) checks.noConsoleErrors = false;
+      if (b2Result.pageErrors.length > 0) checks.noPageErrors = false;
+      if (b2Result.failedRequests.length > 0) checks.noFailedRequests = false;
+
+      allConsoleErrors.push(...b2Result.consoleErrors);
+      allPageErrors.push(...b2Result.pageErrors);
+      allFailedRequests.push(...b2Result.failedRequests);
+
+      if (b2Result.b2Proof?.diagnosticsRecords) {
+        rawDiagnostics.push(...b2Result.b2Proof.diagnosticsRecords);
+      }
+    } else if (phase0Url.includes('proof=b2') && browserResult.b2Proof) {
+      checks.b2Boot = true;
+      checks.b2RoomGeneration = Boolean(browserResult.b2Proof.checks?.b2RoomGeneration);
+      checks.b2MaterialGeneration = Boolean(browserResult.b2Proof.checks?.b2MaterialGeneration);
+      checks.b2CharacterIntegration = Boolean(browserResult.b2Proof.checks?.b2CharacterIntegration);
+      checks.b2CombatExecution = Boolean(browserResult.b2Proof.checks?.b2CombatExecution);
+      checks.b2WinState = Boolean(browserResult.b2Proof.checks?.b2WinState);
+      if (browserResult.b2Proof.diagnosticsRecords) {
+        rawDiagnostics.push(...browserResult.b2Proof.diagnosticsRecords);
+      }
     } else if (phase0Url.includes('proof=b1') && browserResult.b1Proof) {
       checks.b1Boot = true;
       checks.b1CharacterGeneration = Boolean(browserResult.b1Proof.checks?.hasGeometry && browserResult.b1Proof.checks?.hasSkeleton && browserResult.b1Proof.checks?.skinningNormalized);
@@ -266,7 +309,11 @@ export async function runEvaluation(options = {}) {
       ...browserResult.domDetails,
       b1Phase: b1Result?.domDetails?.b1Phase || browserResult.domDetails?.b1Phase || '',
       b1Speed: b1Result?.domDetails?.b1Speed || browserResult.domDetails?.b1Speed || '',
-      b1Contact: b1Result?.domDetails?.b1Contact || browserResult.domDetails?.b1Contact || ''
+      b1Contact: b1Result?.domDetails?.b1Contact || browserResult.domDetails?.b1Contact || '',
+      b2Banner: b2Result?.domDetails?.b2Banner || browserResult.domDetails?.b2Banner || '',
+      b2PlayerHp: b2Result?.domDetails?.b2PlayerHp || browserResult.domDetails?.b2PlayerHp || '',
+      b2EnemyHp: b2Result?.domDetails?.b2EnemyHp || browserResult.domDetails?.b2EnemyHp || '',
+      b2Hits: b2Result?.domDetails?.b2Hits || browserResult.domDetails?.b2Hits || ''
     };
 
     const report = {
@@ -280,7 +327,7 @@ export async function runEvaluation(options = {}) {
       telemetry,
       captures,
       browserDetails: {
-        url: isCustomSingleTarget ? phase0Url : 'http://localhost:5173/ (Full Suite: Phase 0 + Proof A + Proof B1)',
+        url: isCustomSingleTarget ? phase0Url : 'http://localhost:5173/ (Full Suite: Phase 0 + Proof A + Proof B1 + Proof B2)',
         httpStatus: browserResult.httpStatus,
         dom: combinedDom,
         targets: {
@@ -301,6 +348,12 @@ export async function runEvaluation(options = {}) {
             httpStatus: b1Result.httpStatus,
             b1Proof: b1Result.b1Proof,
             dom: b1Result.domDetails
+          } : null,
+          b2: b2Result ? {
+            url: 'http://localhost:5173/?proof=b2&controlled=1',
+            httpStatus: b2Result.httpStatus,
+            b2Proof: b2Result.b2Proof,
+            dom: b2Result.domDetails
           } : null
         },
         consoleErrors: allConsoleErrors,
