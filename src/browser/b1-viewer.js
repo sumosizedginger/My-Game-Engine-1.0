@@ -20,7 +20,8 @@ import {
   SkeletonHelper,
   PlaneGeometry,
   MeshBasicMaterial,
-  Mesh
+  Mesh,
+  Vector3
 } from 'three';
 
 import { buildHumanoidCharacter, HUMANOID_PRESETS } from '../character/index.js';
@@ -186,7 +187,7 @@ export function createB1Viewer({ container, isControlled = false }) {
       );
     }
 
-    if (skeletonHelper && skeletonHelper.visible) {
+    if (skeletonHelper && skeletonHelper.visible && typeof skeletonHelper.update === 'function') {
       skeletonHelper.update();
     }
 
@@ -260,6 +261,17 @@ export function createB1Viewer({ container, isControlled = false }) {
     get skinningNormalized() { return character.skinning.stats.allNormalized; },
     get maxNormalizationError() { return character.skinning.stats.maxNormalizationError; },
     getPhase: () => evaluator.getPhase(),
+    getRealizedFootPositions() {
+      if (!character || !character.bonesByName) return null;
+      const leftVec = new Vector3();
+      const rightVec = new Vector3();
+      if (character.bonesByName.foot_l) character.bonesByName.foot_l.getWorldPosition(leftVec);
+      if (character.bonesByName.foot_r) character.bonesByName.foot_r.getWorldPosition(rightVec);
+      return {
+        left: { x: leftVec.x, y: leftVec.y, z: leftVec.z },
+        right: { x: rightVec.x, y: rightVec.y, z: rightVec.z }
+      };
+    },
     getStats: () => ({
       phase: evaluator.getPhase(),
       speed: evaluator.getSpeed(),
@@ -286,6 +298,13 @@ export function createB1Viewer({ container, isControlled = false }) {
         evaluator = createLocomotionEvaluator(character, currentMotionPreset);
         step(0);
       }
+    },
+    setCameraOrbit(phi, theta, radius) {
+      if (phi !== undefined) orbitPhi = phi;
+      if (theta !== undefined) orbitTheta = theta;
+      if (radius !== undefined) orbitRadius = radius;
+      updateCameraTransform();
+      if (!running) renderer.render(scene, camera);
     },
     toggleWireframe() {
       isWireframe = !isWireframe;

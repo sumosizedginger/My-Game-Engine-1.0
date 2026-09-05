@@ -75,11 +75,11 @@ Spine Chain:
   headApex   -> (0, height, 0)
 
 Left Upper Limb (mirrored X for Right):
-  clavicle.L -> (shoulderHalf * 0.35, shoulderY - 0.01, 0.01)
-  shoulder.L -> (shoulderHalf, shoulderY, 0)
-  elbow.L    -> (shoulderHalf + 0.03, shoulderY - upperArmL, -0.015)
-  wrist.L    -> (shoulderHalf + 0.035, shoulderY - upperArmL - forearmL, 0)
-  hand.L     -> (shoulderHalf + 0.04, shoulderY - upperArmL - forearmL - handL, 0)
+  clavicle.L -> (shoulderHalf * 0.35, neckBaseY - 0.015, 0.01)
+  shoulder.L -> (shoulderHalf * 0.94, shoulderY, 0)
+  elbow.L    -> (shoulderHalf * 0.88, shoulderY - upperArmL, -0.01)
+  wrist.L    -> (shoulderHalf * 0.84, shoulderY - upperArmL - forearmL, 0)
+  hand.L     -> (shoulderHalf * 0.82, shoulderY - upperArmL - forearmL - handL, 0)
 
 Left Lower Limb (mirrored X for Right):
   hip.L      -> (hipHalf, hipY, 0)
@@ -97,11 +97,13 @@ Humanoid meshes are generated using lofted cross-sectional rings.
 
 ### 4.1 Topology Rules
 
-1. **Continuous Limb Tubes**: Limbs are generated as continuous parametric tubes spanning proximal to distal joints (shoulder $\to$ elbow $\to$ wrist, hip $\to$ knee $\to$ ankle). Internal interior dome caps are strictly prohibited between adjacent limb segments.
-2. **Joint Loop Clusters**: Exactly 3 edge loops are clustered within $\pm 2.5\text{ cm}$ of the bend axis at knees, elbows, and waist. When bones rotate, these rings distribute the curvature evenly.
-3. **Flared Torso Shoulders**: The upper chest flaring matches the lateral shoulder joint coordinates ($x \approx \pm \text{shoulderHalf}$) to ensure the torso and upper arm intersect seamlessly without gaps.
-4. **Anatomical Head Proportion**: The cranial volume is an ellipsoid with height $H_{\text{head}} = 0.13 \times H$ ($\approx 23.4\text{ cm}$), width $16.6\text{ cm}$, and depth $20.8\text{ cm}$, tapering at the jaw.
-5. **Flat Foot Base**: The sole of the foot geometry rests cleanly on the ground plane $Y = 0$, guaranteeing zero penetration beneath the floor.
+1. **Continuous Limb Tubes**: Limbs are generated as continuous parametric tubes spanning proximal to distal joints (shoulder $\to$ elbow $\to$ wrist, hip $\to$ knee $\to$ ankle). Internal interior dome caps are strictly prohibited between adjacent limb segments. Proximal limb origins (deltoid and femoral head) utilize coaxial dome caps aligned with the limb's longitudinal axis to prevent angular fins and bat-wing distortion.
+2. **Joint Loop Clusters**: Exactly 3 edge loops are clustered within $\pm 2.0\text{ cm}$ of the bend axis at knees, elbows, and waist. When bones rotate, these rings distribute the curvature evenly.
+3. **Flared Torso Shoulders & Trapezius**: The upper chest flaring reaches $0.82 \times \text{shoulderHalf}$ at shoulder level with a dedicated trapezius station at $0.56 \times \text{shoulderHalf}$, seamlessly nesting the upper arm deltoid domes ($0.94 \times \text{shoulderHalf}$) without underarm gaps or lateral hollow notches.
+4. **Anatomical Head & Neck Proportion**: The cervical column lofts smoothly into the mandible without horizontal collar shelves or inverted face normals. Cranial volume ellipsoid has height $H_{\text{head}} = 0.13 \times H$ ($\approx 23.4\text{ cm}$), width $16.6\text{ cm}$, and depth $20.8\text{ cm}$, tapering at the jaw.
+5. **Flat Foot Base**: The sole of the foot geometry rests cleanly on the ground plane $Y = 0$ (lowest vertices $|Y| \le 0.001\text{ m}$), guaranteeing zero penetration beneath the floor.
+6. **Dynamic Segment Resolution**: Mesh polygon resolution scales dynamically with definition parameters `torsoSegments` and `limbSegments`.
+7. **Semantic Body Regions**: Vertices carry explicit semantic region IDs (`REGIONS.PELVIS` through `REGIONS.FOOT_R`, including `REGIONS.TORSO`). Torso vertices are attributed exclusively to axial spine bones (`pelvis`, `spine`, `chest`).
 
 ---
 
@@ -153,7 +155,7 @@ $$t = \text{clamp}\left( \frac{(\vec{P} - \vec{A}) \cdot \vec{u}}{|\vec{u}|^2}, 
 $$\text{proj} = \vec{A} + t \cdot \vec{u}$$
 $$d = |\vec{P} - \text{proj}|$$
 
-The raw bone weight uses inverse distance with smoothing radius $\epsilon = 0.01\text{ m}$:
+The raw bone weight uses inverse distance with smoothing radius $\epsilon = 0.015\text{ m}$:
 $$w_{\text{raw}} = \frac{1}{(d + \epsilon)^2}$$
 
 ### 6.2 Normalization Invariant
@@ -189,3 +191,39 @@ The `buildHumanoidCharacter(input, materialOptions)` factory executes the comple
 2. **No Hair or Dynamic Cloth Sim**: Secondary physics belongs to later dedicated FX proofs.
 3. **No Facial Rigging**: Facial animation and phoneme shapes belong to later character expression proofs.
 4. **No Transform Authority Mutation**: Character Forge does not mutate entity world transforms; transforms are owned solely by the engine runtime.
+
+---
+
+## 9. Donor Provenance
+
+In accordance with `AGENTS.md` and `DEPENDENCY_POLICY.md`, procedural character concepts and algorithms adapted from prior donor repositories are cataloged below:
+
+```text
+Donor Repository: sumosizedginger/my-engine-2
+Source Commit SHA: 08d3fde6840754a0734e967cea94c4c3805115ee
+License: MIT
+
+1. Path: src/character/humanoid-parameters.js
+   Classification: ADAPT
+   Why: Provided validated anatomical parameter domains and default bounds for height, limbs, and proportions.
+   Material Changes: Converted to pure JavaScript module with explicit clamping diagnostics and frozen presets.
+   Tests: tests/character.test.js ('resolves standard average preset', 'clamps out-of-bounds parameter values').
+
+2. Path: src/character/skeleton-forge.js
+   Classification: ADAPT
+   Why: Established the canonical 22-bone humanoid topological hierarchy and parent-child link ordering.
+   Material Changes: Aligned bone offsets strictly to semantic landmark vectors rather than procedural math shortcuts.
+   Tests: tests/character.test.js ('instantiates the canonical 22-bone hierarchy with valid bind matrices').
+
+3. Path: src/character/skeleton-skinning-proof.js
+   Classification: ADAPT
+   Why: Established distance-to-segment bone weight synthesis and the strict sum(w_i) == 1.0 normalization invariant.
+   Material Changes: Added region-gated candidate bone sets to eliminate contralateral weight bleeding; tuned smoothing radius to 0.015m.
+   Tests: tests/character.test.js ('satisfies the strict normalization invariant', 'prevents contralateral weight bleeding').
+
+4. Path: src/character/canonical-humanoid.js
+   Classification: REFERENCE
+   Why: Provided architectural precedent for procedural assembly of SkinnedMesh from generated buffers.
+   Material Changes: Re-implemented cleanly from first principles to ensure single continuous axial loft and zero mesh seams.
+   Tests: tests/character.test.js ('builds complete SkinnedMesh for average, athletic, and heavy presets').
+```

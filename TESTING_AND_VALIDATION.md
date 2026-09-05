@@ -587,7 +587,7 @@ The evaluation harness (`src/eval/*`) provides automated, headless real-browser 
   - Exit code `0` = PASS (all checks passed with zero fatal/error diagnostics).
   - Exit code `1` = FAIL (one or more checks failed or fatal errors encountered).
   - Executes headless real-browser validation (`puppeteer-core`).
-- **Default Suite Targets**: By default, `npm run eval` executes the full two-target evaluation suite:
+- **Default Suite Targets**: By default, `npm run eval` executes the full three-target evaluation suite:
   1. **Phase 0 Controlled Boot Proof**:
      - URL: `http://localhost:5173/?controlled=1`
      - Evaluates foundational engine boot and purity checks (`boot`, `runtimeMode`, `fullEngineSeam`, `purity`, `noConsoleErrors`, `noPageErrors`, `noFailedRequests`, `domStatusPass`).
@@ -599,9 +599,18 @@ The evaluation harness (`src/eval/*`) provides automated, headless real-browser 
        - `pongGameplay`: Verifies action-based input injection (`MoveUp`), single-writer transform motion, and simulation state transitions (`PLAYING`).
        - `pongScoring`: Verifies ball deflection/bounds triggers, rule evaluation, score variable updates, and synchronized DOM HUD display updates.
      - Produces game capture fixture: `artifacts/captures/proof_a_pong_fixture.png`.
+  3. **Proof B1 Motion Truth Fixture**:
+     - URL: `http://localhost:5173/?proof=b1&controlled=1`
+     - Evaluates procedural character generation, locomotion kinematics, and realized grounding checks:
+       - `b1Boot`: Verifies HTTP 200, motion viewer initialization, and exposure of motion controller (`window.__PROOF_B1_MOTION__`).
+       - `b1CharacterGeneration`: Verifies procedural mesh synthesis, deformation-ready loop clusters, canonical 22-bone hierarchy, and normalization invariant.
+       - `b1MotionExecution`: Verifies locomotion simulation clock stepping, double-frequency vertical bounce, lateral sway, and counter-phase arm swing.
+       - `b1GroundingCheck`: Verifies multi-frame realized rendered foot bone heights (`foot_l`, `foot_r`) directly from the armature: guarantees zero ground penetration ($Y \ge \text{footH} - 0.001\text{ m}$) and bounded stance float ($Y \le \text{footH} + 0.025\text{ m}$, mean $\le 10\text{ mm}$).
+     - Produces motion capture fixture: `artifacts/captures/proof_b1_motion_fixture.png`.
 - **Capture Fixtures**:
   - `artifacts/captures/phase0_boot_fixture.png` (Phase 0 boot proof)
   - `artifacts/captures/proof_a_pong_fixture.png` (Proof A Pong game)
+  - `artifacts/captures/proof_b1_motion_fixture.png` (Proof B1 Motion truth)
   - Captures record SHA-256 integrity hash, byte size, viewport dimensions (default 1280x720), format, and git revision metadata.
 - **Single-Target / Custom Evaluation**:
   - The programmatic harness (`runEvaluation({ url, captureName })`) supports single-target evaluation if a custom target URL or capture name is specified.

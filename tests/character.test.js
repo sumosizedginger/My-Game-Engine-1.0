@@ -113,6 +113,43 @@ describe('Character Forge — Geometry Generation', () => {
     assert.ok(box.min.y >= -0.05, `Mesh sinks beneath floor: min.y = ${box.min.y}`);
     assert.ok(box.max.y <= parameters.height + 0.05, `Mesh exceeds height: max.y = ${box.max.y}`);
   });
+
+  it('scales vertex count dynamically with torsoSegments and limbSegments parameters', () => {
+    const { parameters } = resolveHumanoidParameters('average');
+    const landmarks = computeSemanticLandmarks(parameters);
+    const gLow = createHumanoidGeometry({ ...parameters, torsoSegments: 12, limbSegments: 8 }, landmarks);
+    const gHigh = createHumanoidGeometry({ ...parameters, torsoSegments: 20, limbSegments: 14 }, landmarks);
+
+    assert.ok(
+      gHigh.rawData.vertexCount > gLow.rawData.vertexCount,
+      `Higher segment resolution should yield more vertices (${gHigh.rawData.vertexCount} vs ${gLow.rawData.vertexCount})`
+    );
+    assert.ok(
+      gHigh.rawData.triangleCount > gLow.rawData.triangleCount,
+      `Higher segment resolution should yield more triangles (${gHigh.rawData.triangleCount} vs ${gLow.rawData.triangleCount})`
+    );
+  });
+
+  it('places lowest foot sole vertices directly on ground plane (Y >= -0.001 and Y <= 0.001)', () => {
+    const { parameters } = resolveHumanoidParameters('average');
+    const landmarks = computeSemanticLandmarks(parameters);
+    const { geometry } = createHumanoidGeometry(parameters, landmarks);
+    const pos = geometry.getAttribute('position');
+    const reg = geometry.getAttribute('region');
+
+    let minFootY = 999;
+    for (let i = 0; i < pos.count; i++) {
+      const r = reg.getX(i);
+      if (r === REGIONS.FOOT_L || r === REGIONS.FOOT_R) {
+        minFootY = Math.min(minFootY, pos.getY(i));
+      }
+    }
+
+    assert.ok(
+      minFootY >= -0.001 && minFootY <= 0.001,
+      `Lowest foot vertex should rest exactly on floor: minFootY = ${minFootY}`
+    );
+  });
 });
 
 describe('Character Forge — Skeleton Hierarchy', () => {
@@ -231,6 +268,45 @@ describe('Character Forge — Skinning & Normalization Invariant', () => {
         }
       }
     }
+  });
+
+  it('attributes REGIONS.TORSO vertices exclusively to axial spine bones (pelvis, spine, chest)', () => {
+    const { parameters } = resolveHumanoidParameters('average');
+    const landmarks = computeSemanticLandmarks(parameters);
+    const { geometry } = createHumanoidGeometry(parameters, landmarks);
+    applyHumanoidSkinning(geometry, landmarks);
+
+    const pos = geometry.getAttribute('position');
+    const reg = geometry.getAttribute('region');
+    const indices = geometry.getAttribute('skinIndex');
+    const weights = geometry.getAttribute('skinWeight');
+
+    const torsoBoneIndices = new Set([
+      BONE_NAME_TO_INDEX.pelvis,
+      BONE_NAME_TO_INDEX.spine,
+      BONE_NAME_TO_INDEX.chest
+    ]);
+
+    let torsoVertexCount = 0;
+    for (let i = 0; i < pos.count; i++) {
+      if (reg.getX(i) === REGIONS.TORSO) {
+        torsoVertexCount++;
+        for (const [boneIdx, weight] of [
+          [indices.getX(i), weights.getX(i)],
+          [indices.getY(i), weights.getY(i)],
+          [indices.getZ(i), weights.getZ(i)],
+          [indices.getW(i), weights.getW(i)]
+        ]) {
+          if (weight > 0.01) {
+            assert.ok(
+              torsoBoneIndices.has(boneIdx),
+              `REGIONS.TORSO vertex ${i} received weight ${weight} on non-torso bone index ${boneIdx}`
+            );
+          }
+        }
+      }
+    }
+    assert.ok(torsoVertexCount > 0, 'Mesh must contain vertices with region REGIONS.TORSO');
   });
 });
 

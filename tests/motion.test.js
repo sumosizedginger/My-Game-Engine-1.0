@@ -165,6 +165,90 @@ describe('Motion Forge — Foot Grounding & Stance Height', () => {
       `Peak clearance deviation: ${peakHeight} vs ${footH + stepHeight}`
     );
   });
+
+  it('enforces C1 boundary continuity at toe-off and cycle wrap', () => {
+    const footH = 0.09;
+    const strideLength = 1.30;
+    const stepHeight = 0.055;
+    const hipX = 0.12;
+
+    // Toe-off boundary (p = 0.60)
+    const pToePre = computeGaitFootPlacement({ phase: 0.599999, strideLength, stepHeight, footH, hipX });
+    const pToePost = computeGaitFootPlacement({ phase: 0.600001, strideLength, stepHeight, footH, hipX });
+    const dYToe = Math.abs(pToePre.targetPos.y - pToePost.targetPos.y);
+    const dZToe = Math.abs(pToePre.targetPos.z - pToePost.targetPos.z);
+    assert.ok(dYToe < 1e-4, `Toe-off Y discontinuity: ${dYToe}`);
+    assert.ok(dZToe < 1e-4, `Toe-off Z discontinuity: ${dZToe}`);
+
+    // Cycle wrap boundary (p = 0.00 / 1.00)
+    const pWrapPre = computeGaitFootPlacement({ phase: 0.999999, strideLength, stepHeight, footH, hipX });
+    const pWrapPost = computeGaitFootPlacement({ phase: 0.000001, strideLength, stepHeight, footH, hipX });
+    const dYWrap = Math.abs(pWrapPre.targetPos.y - pWrapPost.targetPos.y);
+    const dZWrap = Math.abs(pWrapPre.targetPos.z - pWrapPost.targetPos.z);
+    assert.ok(dYWrap < 1e-4, `Wrap Y discontinuity: ${dYWrap}`);
+    assert.ok(dZWrap < 1e-4, `Wrap Z discontinuity: ${dZWrap}`);
+  });
+
+  it('guarantees realized foot bone heights remain grounded (<= footH + 25mm, mean <= 10mm, zero penetration) across walk cycle', () => {
+    const char = buildHumanoidCharacter('average');
+    const evaluator = createLocomotionEvaluator(char, 'natural');
+    const footH = char.parameters.height * 0.05; // 0.090m
+
+    let maxFloat = 0;
+    let minFloat = 999;
+    let sumFloat = 0;
+    let stanceCount = 0;
+
+    for (let i = 0; i < 200; i++) {
+      const res = evaluator.update(0.016);
+      if (res.contactStates.left) {
+        const floatL = res.contactStates.leftRealizedY - footH;
+        maxFloat = Math.max(maxFloat, floatL);
+        minFloat = Math.min(minFloat, floatL);
+        sumFloat += floatL;
+        stanceCount++;
+      }
+      if (res.contactStates.right) {
+        const floatR = res.contactStates.rightRealizedY - footH;
+        maxFloat = Math.max(maxFloat, floatR);
+        minFloat = Math.min(minFloat, floatR);
+        sumFloat += floatR;
+        stanceCount++;
+      }
+    }
+
+    assert.ok(stanceCount > 100, `Expected > 100 stance samples, got ${stanceCount}`);
+    assert.ok(
+      maxFloat <= 0.025,
+      `Realized foot float exceeded 25mm limit: maxFloat = ${(maxFloat * 1000).toFixed(2)}mm`
+    );
+    assert.ok(
+      minFloat >= -0.001,
+      `Realized foot penetrated ground: minFloat = ${(minFloat * 1000).toFixed(2)}mm`
+    );
+    const meanFloat = sumFloat / stanceCount;
+    assert.ok(
+      meanFloat <= 0.010,
+      `Realized foot mean float exceeded 10mm target: meanFloat = ${(meanFloat * 1000).toFixed(2)}mm`
+    );
+  });
+
+  it('verifies realized foot IK tracking error remains bounded across walk cycle', () => {
+    const char = buildHumanoidCharacter('average');
+    const evaluator = createLocomotionEvaluator(char, 'natural');
+
+    for (let i = 0; i < 200; i++) {
+      const res = evaluator.update(0.016);
+      assert.ok(
+        res.contactStates.leftError < 0.015,
+        `Left IK tracking error exceeded 15mm: ${(res.contactStates.leftError * 1000).toFixed(2)}mm`
+      );
+      assert.ok(
+        res.contactStates.rightError < 0.015,
+        `Right IK tracking error exceeded 15mm: ${(res.contactStates.rightError * 1000).toFixed(2)}mm`
+      );
+    }
+  });
 });
 
 describe('Motion Forge — Locomotion Generator', () => {

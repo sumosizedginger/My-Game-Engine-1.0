@@ -170,11 +170,14 @@ export async function runEvaluation(options = {}) {
       { severity: 'INFO', code: 'BOOT_COMPLETE', subsystem: 'runtime' }
     ];
 
+    let pongResult = null;
+    let b1Result = null;
+
     // 4. If running standard full suite, evaluate Proof A Pong AND Proof B1 Motion
     if (!isCustomSingleTarget) {
       // 4a. Proof A Pong
       const pongUrl = 'http://localhost:5173/?game=pong&controlled=1';
-      const pongResult = await runBrowserEvaluation({
+      pongResult = await runBrowserEvaluation({
         url: pongUrl,
         viewport,
         captureScreenshot: true
@@ -202,7 +205,7 @@ export async function runEvaluation(options = {}) {
 
       // 4b. Proof B1 Motion Truth
       const b1Url = 'http://localhost:5173/?proof=b1&controlled=1';
-      const b1Result = await runBrowserEvaluation({
+      b1Result = await runBrowserEvaluation({
         url: b1Url,
         viewport,
         captureScreenshot: true
@@ -259,6 +262,13 @@ export async function runEvaluation(options = {}) {
       pageErrorCount: allPageErrors.length
     };
 
+    const combinedDom = {
+      ...browserResult.domDetails,
+      b1Phase: b1Result?.domDetails?.b1Phase || browserResult.domDetails?.b1Phase || '',
+      b1Speed: b1Result?.domDetails?.b1Speed || browserResult.domDetails?.b1Speed || '',
+      b1Contact: b1Result?.domDetails?.b1Contact || browserResult.domDetails?.b1Contact || ''
+    };
+
     const report = {
       schemaVersion: '1.0.0',
       harness: 'A0-Evaluation-Harness',
@@ -272,7 +282,27 @@ export async function runEvaluation(options = {}) {
       browserDetails: {
         url: isCustomSingleTarget ? phase0Url : 'http://localhost:5173/ (Full Suite: Phase 0 + Proof A + Proof B1)',
         httpStatus: browserResult.httpStatus,
-        dom: browserResult.domDetails,
+        dom: combinedDom,
+        targets: {
+          phase0: {
+            url: phase0Url,
+            httpStatus: browserResult.httpStatus,
+            bootProof: browserResult.bootProof,
+            dom: browserResult.domDetails
+          },
+          pong: pongResult ? {
+            url: 'http://localhost:5173/?game=pong&controlled=1',
+            httpStatus: pongResult.httpStatus,
+            pongProof: pongResult.pongProof,
+            dom: pongResult.domDetails
+          } : null,
+          b1: b1Result ? {
+            url: 'http://localhost:5173/?proof=b1&controlled=1',
+            httpStatus: b1Result.httpStatus,
+            b1Proof: b1Result.b1Proof,
+            dom: b1Result.domDetails
+          } : null
+        },
         consoleErrors: allConsoleErrors,
         pageErrors: allPageErrors,
         failedRequests: allFailedRequests

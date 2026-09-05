@@ -52,7 +52,7 @@ function buildBoneSegments(landmarks) {
   return {
     pelvis: {
       a: getLm('pelvis'),
-      b: { x: 0, y: getLm('pelvis').y - 0.1, z: 0 },
+      b: { x: 0, y: getLm('pelvis').y - 0.045, z: -0.015 },
       bone: 'pelvis'
     },
     spine: {
@@ -66,19 +66,19 @@ function buildBoneSegments(landmarks) {
       bone: 'chest'
     },
     neck: {
-      a: getLm('chest'),
-      b: getLm('neck'),
+      a: getLm('neck'),
+      b: getLm('head'),
       bone: 'neck'
     },
     head: {
-      a: getLm('neck'),
+      a: getLm('head'),
       b: getLm('headApex'),
       bone: 'head'
     },
     // Left arm
     shoulder_l: {
-      a: getLm('chest'),
-      b: getLm('clavicle.L'),
+      a: getLm('clavicle.L'),
+      b: getLm('shoulder.L'),
       bone: 'shoulder_l'
     },
     upperarm_l: {
@@ -98,8 +98,8 @@ function buildBoneSegments(landmarks) {
     },
     // Right arm
     shoulder_r: {
-      a: getLm('chest'),
-      b: getLm('clavicle.R'),
+      a: getLm('clavicle.R'),
+      b: getLm('shoulder.R'),
       bone: 'shoulder_r'
     },
     upperarm_r: {
@@ -129,13 +129,13 @@ function buildBoneSegments(landmarks) {
       bone: 'shin_l'
     },
     foot_l: {
-      a: getLm('ankle.L'),
-      b: getLm('toe.L'),
+      a: { x: getLm('ankle.L').x, y: 0.025, z: getLm('heel.L').z },
+      b: { x: getLm('ankle.L').x, y: 0.020, z: getLm('toe.L').z * 0.70 },
       bone: 'foot_l'
     },
     toe_l: {
-      a: getLm('toe.L'),
-      b: { x: getLm('toe.L').x, y: getLm('toe.L').y, z: getLm('toe.L').z + 0.05 },
+      a: { x: getLm('ankle.L').x, y: 0.020, z: getLm('toe.L').z * 0.70 },
+      b: getLm('toe.L'),
       bone: 'toe_l'
     },
     // Right leg
@@ -150,13 +150,13 @@ function buildBoneSegments(landmarks) {
       bone: 'shin_r'
     },
     foot_r: {
-      a: getLm('ankle.R'),
-      b: getLm('toe.R'),
+      a: { x: getLm('ankle.R').x, y: 0.025, z: getLm('heel.R').z },
+      b: { x: getLm('ankle.R').x, y: 0.020, z: getLm('toe.R').z * 0.70 },
       bone: 'foot_r'
     },
     toe_r: {
-      a: getLm('toe.R'),
-      b: { x: getLm('toe.R').x, y: getLm('toe.R').y, z: getLm('toe.R').z + 0.05 },
+      a: { x: getLm('ankle.R').x, y: 0.020, z: getLm('toe.R').z * 0.70 },
+      b: getLm('toe.R'),
       bone: 'toe_r'
     }
   };
@@ -167,7 +167,7 @@ function buildBoneSegments(landmarks) {
  * Prevents unintended weight bleeding between contralateral limbs.
  */
 const REGION_CANDIDATE_BONES = Object.freeze({
-  [REGIONS.PELVIS]: ['pelvis', 'spine', 'thigh_l', 'thigh_r'],
+  [REGIONS.PELVIS]: ['pelvis', 'spine'],
   [REGIONS.SPINE]: ['pelvis', 'spine', 'chest'],
   [REGIONS.CHEST]: ['spine', 'chest', 'neck', 'shoulder_l', 'shoulder_r'],
   [REGIONS.NECK]: ['chest', 'neck', 'head'],
@@ -183,7 +183,8 @@ const REGION_CANDIDATE_BONES = Object.freeze({
   [REGIONS.FOOT_L]: ['shin_l', 'foot_l', 'toe_l'],
   [REGIONS.THIGH_R]: ['pelvis', 'thigh_r', 'shin_r'],
   [REGIONS.SHIN_R]: ['thigh_r', 'shin_r', 'foot_r'],
-  [REGIONS.FOOT_R]: ['shin_r', 'foot_r', 'toe_r']
+  [REGIONS.FOOT_R]: ['shin_r', 'foot_r', 'toe_r'],
+  [REGIONS.TORSO]: ['pelvis', 'spine', 'chest']
 });
 
 /**
@@ -204,7 +205,7 @@ export function applyHumanoidSkinning(geometry, landmarks) {
   const skinWeights = new Float32Array(vertexCount * 4);
 
   let maxNormError = 0;
-  const epsilon = 0.01; // 1cm smoothing radius
+  const epsilon = 0.015; // 1.5cm smoothing radius for organic joint flexion without joint paralysis
 
   for (let i = 0; i < vertexCount; i++) {
     const px = posAttr.getX(i);

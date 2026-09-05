@@ -125,7 +125,9 @@ export function runBrowserEvaluation({
         const p1Score = document.getElementById('p1-score')?.textContent?.trim() || '';
         const p2Score = document.getElementById('p2-score')?.textContent?.trim() || '';
         const b1Phase = document.getElementById('b1-stat-phase')?.textContent?.trim() || '';
-        return { engineTitle, bootStatus, repoId, toolchainLabel, matchStatusBadge, p1Score, p2Score, b1Phase };
+        const b1Speed = document.getElementById('b1-stat-speed')?.textContent?.trim() || '';
+        const b1Contact = document.getElementById('b1-stat-contact')?.textContent?.trim() || '';
+        return { engineTitle, bootStatus, repoId, toolchainLabel, matchStatusBadge, p1Score, p2Score, b1Phase, b1Speed, b1Contact };
       });
 
       // Capture deterministic baseline screenshot
@@ -164,7 +166,6 @@ export function runBrowserEvaluation({
             for (let i = 0; i < 4; i++) {
               game.stepOnce(20);
             }
-
             const afterScore = game.getState();
             const scoredPoint = afterScore.scores.player1 === 1 && afterScore.status === 'SERVE';
 
@@ -214,16 +215,49 @@ export function runBrowserEvaluation({
             const hasSkeleton = b1.boneCount === 22;
             const skinningNormalized = b1.skinningNormalized && b1.maxNormalizationError < 1e-4;
 
-            // 2. Controlled motion step (step 250ms = 1/4 second)
-            const stepRes = b1.step(250);
+            // 2. Controlled multi-step gait motion evaluation (step 5 frames x 50ms = 250ms)
+            const footH = 0.05 * 1.80; // 0.090m for 1.80m average character
+            let maxRealizedFloat = 0;
+            let minRealizedFloat = 999;
+            let maxRealizedError = 0;
+            let realizedGroundingPass = true;
+
+            let stepRes = null;
+            for (let f = 0; f < 5; f++) {
+              stepRes = b1.step(50);
+              const feet = b1.getRealizedFootPositions();
+              if (feet && stepRes.contactStates) {
+                if (stepRes.contactStates.left) {
+                  const floatL = feet.left.y - footH;
+                  maxRealizedFloat = Math.max(maxRealizedFloat, floatL);
+                  minRealizedFloat = Math.min(minRealizedFloat, floatL);
+                  const errL = Math.abs(feet.left.y - stepRes.contactStates.leftHeight);
+                  maxRealizedError = Math.max(maxRealizedError, errL);
+                  if (feet.left.y > footH + 0.025 || feet.left.y < footH - 0.001) {
+                    realizedGroundingPass = false;
+                  }
+                }
+                if (stepRes.contactStates.right) {
+                  const floatR = feet.right.y - footH;
+                  maxRealizedFloat = Math.max(maxRealizedFloat, floatR);
+                  minRealizedFloat = Math.min(minRealizedFloat, floatR);
+                  const errR = Math.abs(feet.right.y - stepRes.contactStates.rightHeight);
+                  maxRealizedError = Math.max(maxRealizedError, errR);
+                  if (feet.right.y > footH + 0.025 || feet.right.y < footH - 0.001) {
+                    realizedGroundingPass = false;
+                  }
+                }
+              }
+            }
+
             const afterStep = b1.getStats();
             const phaseAdvanced = afterStep.phase > 0;
             const speedValid = afterStep.speed > 0.5 && afterStep.speed < 3.0;
 
-            // 3. Grounding height check
+            // 3. Grounding height check: target height valid and realized bones grounded
             const leftH = stepRes.contactStates.leftHeight;
             const rightH = stepRes.contactStates.rightHeight;
-            const groundingValid = leftH >= 0.05 && rightH >= 0.05;
+            const groundingValid = leftH >= 0.05 && rightH >= 0.05 && realizedGroundingPass;
 
             // 4. Dynamic Pelvis check (pelvis moved dynamically)
             const pelvisDynamic = Math.abs(stepRes.pelvisState.bounceY) > 0 || Math.abs(stepRes.pelvisState.swayX) > 0;
@@ -235,6 +269,7 @@ export function runBrowserEvaluation({
               phaseAdvanced &&
               speedValid &&
               groundingValid &&
+              realizedGroundingPass &&
               pelvisDynamic
             );
 
@@ -247,6 +282,7 @@ export function runBrowserEvaluation({
                 phaseAdvanced,
                 speedValid,
                 groundingValid,
+                realizedGroundingPass,
                 pelvisDynamic,
                 vertexCount: b1.vertexCount,
                 triangleCount: b1.triangleCount,
@@ -256,12 +292,15 @@ export function runBrowserEvaluation({
                 speed: afterStep.speed,
                 leftHeight: leftH,
                 rightHeight: rightH,
+                maxRealizedFloat,
+                minRealizedFloat,
+                maxRealizedError,
                 maxNormError: b1.maxNormalizationError
               },
               diagnosticsRecords: [
                 { severity: 'INFO', code: 'B1_CHAR_OK', subsystem: 'character', message: `Vertices: ${b1.vertexCount}, Bones: ${b1.boneCount}` },
                 { severity: 'INFO', code: 'B1_MOTION_OK', subsystem: 'motion', message: `Speed: ${afterStep.speed.toFixed(2)}m/s, Phase: ${(afterStep.phase * 100).toFixed(1)}%` },
-                { severity: 'INFO', code: 'B1_GROUNDING_OK', subsystem: 'motion', message: `L: ${leftH.toFixed(3)}m, R: ${rightH.toFixed(3)}m` }
+                { severity: 'INFO', code: 'B1_GROUNDING_OK', subsystem: 'motion', message: `RealizedFloat: ${(maxRealizedFloat * 1000).toFixed(1)}mm, RealizedErr: ${(maxRealizedError * 1000).toFixed(3)}mm` }
               ]
             };
           } catch (evalErr) {

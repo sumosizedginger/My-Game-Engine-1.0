@@ -18,8 +18,8 @@ This document defines the durable procedural character motion and locomotion arc
 3. **Continuous Periodic Gait Phase**: Locomotion cycles evaluate continuously over normalized phase $\phi \in [0, 1)$. The left leg evaluates at $\phi_L = \phi$; the right leg evaluates exactly half a cycle out of phase ($\phi_R = (\phi + 0.5) \pmod 1.0$). Loop boundaries wrap with zero jerk or discontinuity.
 4. **Stance & Swing Phasing**: Each leg cycle divides into a 60% ground stance phase ($\phi \in [0, 0.60]$) and a 40% aerial swing phase ($\phi \in [0.60, 1.0]$).
 5. **Analytical 2-Bone IK Without Popping**: Leg kinematics use closed-form analytical 2-bone inverse kinematics with smooth reach clamping strictly below $L_1 + L_2$ to eliminate mathematical singularities and knee hyper-extension popping.
-6. **Strict Grounding Guarantee**: During stance phase, the foot sole is clamped to the ground plane: ankle height $Y \ge \text{footH}$ (zero penetration beneath floor) and $Y \le \text{footH} + 0.025\text{ m}$ (zero floating during contact).
-7. **Counter-Phase Arm Dynamics**: The contralateral arm swings forward with the advancing leg, featuring dynamic elbow flexion on forward swing and secondary wrist lag trailing swing velocity.
+6. **Strict Realized Grounding Guarantee**: Grounding is evaluated on the actual realized world positions of rendered foot bones (`foot_l`, `foot_r`), not analytic targets. During stance phase, realized foot bone world height must remain within: $Y_{\text{realized}} \le \text{footH} + 0.025\text{ m}$ (max float $\le 25\text{ mm}$, mean float $\le 10\text{ mm}$) and $Y_{\text{realized}} \ge \text{footH} - 0.001\text{ m}$ (zero floor penetration).
+7. **Counter-Phase Arm Dynamics**: The contralateral arm swings forward with the advancing leg, featuring organic compound elbow flexion ($\approx 40^\circ$ forward arc) and secondary wrist lag trailing swing velocity.
 
 ---
 

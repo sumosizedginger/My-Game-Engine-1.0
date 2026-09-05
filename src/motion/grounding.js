@@ -35,6 +35,12 @@ export function computeGaitFootPlacement({
 
   const STANCE_RATIO = 0.60; // 60% stance, 40% swing
 
+  // Boundary contact angles and heights for C1 continuous transitions
+  const PITCH_TOE = 0.40;   // Rolls up to +23 deg at toe push-off
+  const PITCH_HEEL = -0.28; // Dorsiflexed to -16 deg at heel strike
+  const Y_TOE = footH + Math.sin(PITCH_TOE) * 0.025;
+  const Y_HEEL = footH + Math.sin(-PITCH_HEEL) * 0.015;
+
   if (p <= STANCE_RATIO) {
     // -------------------------------------------------------------
     // STANCE PHASE (Foot on ground, moving backwards relative to hip)
@@ -44,23 +50,25 @@ export function computeGaitFootPlacement({
     // Horizontal Z trajectory: travels linearly from +reachZ to -reachZ
     const z = reachZ - (2 * reachZ) * stanceProgress;
 
-    // Height Y: Strictly clamped to ground plane
+    // Height Y and Pitch: smooth transitions across contact intervals
     let y = footH;
     let pitch = 0; // Radians
 
     if (stanceProgress < 0.18) {
-      // 1. Heel Strike: foot angled upward (dorsiflexion)
+      // 1. Heel Strike: foot angled upward (dorsiflexion), smoothly relaxing to flat foot
       const t = stanceProgress / 0.18;
-      pitch = (-0.30) * (1 - t); // -17 degrees decaying to 0
+      const s = t * t * (3 - 2 * t); // Smoothstep C1
+      pitch = PITCH_HEEL * (1 - s);
       y = footH + Math.sin(-pitch) * 0.015;
     } else if (stanceProgress < 0.65) {
       // 2. Midstance / Flat Foot: perfectly flat on ground
       pitch = 0;
       y = footH;
     } else {
-      // 3. Heel Off / Push Off: heel rises, toe stays down
+      // 3. Heel Off / Push Off: heel rises, toe stays down, smooth roll to toe-off
       const t = (stanceProgress - 0.65) / 0.35;
-      pitch = 0.45 * t; // rolls up to +26 degrees
+      const s = t * t * (3 - 2 * t);
+      pitch = PITCH_TOE * s;
       y = footH + Math.sin(pitch) * 0.025;
     }
 
@@ -84,19 +92,23 @@ export function computeGaitFootPlacement({
     const smoothT = swingProgress * swingProgress * (3 - 2 * swingProgress);
     const z = -reachZ + (2 * reachZ) * smoothT;
 
-    // Parabolic arc for vertical foot clearance
-    const arc = Math.sin(swingProgress * Math.PI);
-    const y = footH + stepHeight * arc;
+    // Continuous vertical clearance arc: smoothly interpolates between Y_TOE and Y_HEEL plus clearance arc
+    const yBase = Y_TOE * (1 - swingProgress) + Y_HEEL * swingProgress;
+    const yArc = stepHeight * Math.sin(swingProgress * Math.PI);
+    const y = yBase + yArc;
 
-    // Pitch transitions from toe-off roll to neutral, then prepares heel-strike
+    // Pitch smoothly transitions from toe-off roll to neutral, then prepares heel-strike
     let pitch = 0;
-    if (swingProgress < 0.4) {
+    if (swingProgress < 0.40) {
       // Relaxing toe-off
-      pitch = 0.35 * (1 - swingProgress / 0.4);
-    } else if (swingProgress > 0.75) {
+      const t = swingProgress / 0.40;
+      const st = t * t * (3 - 2 * t);
+      pitch = PITCH_TOE * (1 - st);
+    } else if (swingProgress > 0.70) {
       // Preparing heel strike
-      const t = (swingProgress - 0.75) / 0.25;
-      pitch = -0.25 * t;
+      const t = (swingProgress - 0.70) / 0.30;
+      const st = t * t * (3 - 2 * t);
+      pitch = PITCH_HEEL * st;
     }
 
     return {
