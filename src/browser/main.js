@@ -110,7 +110,7 @@ if (app) {
       </div>
 
       <div id="toolchain-target-card" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #334155; font-size: 12px; color: #64748b; text-align: center;">
-        <div>Booted at: ${results.timestamp}</div>
+        <div id="boot-timestamp">Booted at: ${new URLSearchParams(window.location.search).has('controlled') ? 'CONTROLLED_FIXTURE' : results.timestamp}</div>
         <div id="toolchain-label" style="margin-top: 4px; color: #94a3b8; font-weight: 500;">
           Canonical Toolchain Target: Node ${results.canonicalToolchainTarget.node} | npm ${results.canonicalToolchainTarget.npm} | Vite ${results.canonicalToolchainTarget.vite}
         </div>

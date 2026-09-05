@@ -4,6 +4,9 @@ node_modules/
 # Production build output
 dist/
 
+# Evaluation harness outputs
+artifacts/
+
 # Logs
 *.log
 npm-debug.log*
