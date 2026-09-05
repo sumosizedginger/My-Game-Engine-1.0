@@ -114,6 +114,7 @@ Entry points:
 - `docs/learn/README.md`
 - `docs/learn/BUILDING_A_TINY_GAME.md`
 - `docs/learn/BUILDING_A_WALKING_CHARACTER.md`
+- `docs/learn/BUILDING_A_PROCEDURAL_COMBAT_ROOM.md`
 
 Learning documents do not override canonical architecture.
 
@@ -443,6 +444,9 @@ Relevant concerns:
 
 Operational note:
 See `TESTING_AND_VALIDATION.md` §22.1 for evaluation harness operations covering Proof B2 targets (`?proof=b2&controlled=1`), checks (`b2Boot`, `b2RoomGeneration`, `b2MaterialGeneration`, `b2CharacterIntegration`, `b2CombatExecution`, `b2WinState`), and capture fixtures (`artifacts/captures/proof_b2_combat_fixture.png`).
+
+Learning note:
+See `docs/learn/BUILDING_A_PROCEDURAL_COMBAT_ROOM.md` for the accepted integration walkthrough.
 
 Use direct procedural construction when simpler than CSG.
 
