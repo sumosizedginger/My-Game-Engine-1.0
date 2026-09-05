@@ -55,6 +55,42 @@ test('B2 live viewport policy is independent of the controlled fixture', async (
       }
     });
 
+    await t.test('only live rendering cuts away the north wall; room truth still encloses it', async () => {
+      for (const controlled of [false, true]) {
+        await page.goto(`${url}/?proof=b2${controlled ? '&controlled=1' : ''}`);
+        await page.waitForFunction(() => Boolean(window.__PROOF_B2_COMBAT__));
+        const walls = await page.evaluate(() => {
+          const { game, renderer } = window.__PROOF_B2_COMBAT__;
+          const room = game.room;
+          const parts = room.visual.parts;
+          const visibility = Object.fromEntries(['northWall', 'southWall', 'eastWall', 'westWall'].map(name => {
+            const mesh = renderer.scene.children.find(child => child.geometry === parts[name]);
+            return [name, mesh?.visible];
+          }));
+          const { depth, wallThickness } = room.definition.data.parameters;
+          const limit = depth / 2 - wallThickness;
+          return {
+            visibility,
+            wallSurface: Array.from(parts.northWall.getAttribute('surfaceId').array).every(id => id === room.semantics.surfaces.WALL),
+            wallRegion: Array.from(parts.northWall.getAttribute('regionId').array).every(id => id === room.semantics.regions.ARENA_WALL_NORTH),
+            mergedWall: Array.from(room.visual.geometry.getAttribute('regionId').array).includes(room.semantics.regions.ARENA_WALL_NORTH),
+            boundaryMatchesDefinition: room.collision.innerBounds.maxZ === limit,
+            blocked: room.collision.resolvePosition(0, depth, 0.4),
+            expectedZ: limit - 0.4,
+            outsideWalkable: room.collision.isWalkable(0, depth, 0.4)
+          };
+        });
+        assert.deepEqual(walls.visibility, { northWall: controlled, southWall: true, eastWall: true, westWall: true });
+        assert.equal(walls.wallSurface, true);
+        assert.equal(walls.wallRegion, true);
+        assert.equal(walls.mergedWall, true);
+        assert.equal(walls.boundaryMatchesDefinition, true);
+        assert.equal(walls.blocked.collided, true);
+        assert.equal(walls.blocked.z, walls.expectedZ);
+        assert.equal(walls.outsideWalkable, false);
+      }
+    });
+
     await t.test('controlled mode retains bounded layout and 500px game viewport', async () => {
       await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
       await page.goto(`${url}/?proof=b2&controlled=1`);

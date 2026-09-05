@@ -79,6 +79,10 @@ export function createCombatRenderer({ container, game, isControlled = false }) 
   const southWall = new Mesh(game.room.visual.parts.southWall, wallMat);
   const eastWall = new Mesh(game.room.visual.parts.eastWall, wallMat);
   const westWall = new Mesh(game.room.visual.parts.westWall, wallMat);
+  // The live spectator camera looks from +Z: cut away the near (north) wall.
+  // Keep the generated WALL geometry and authoritative collision intact.
+  // Controlled captures retain the complete enclosure.
+  northWall.visible = isControlled;
   scene.add(northWall, southWall, eastWall, westWall);
 
   // Pillars
