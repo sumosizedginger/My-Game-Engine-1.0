@@ -539,7 +539,7 @@ function resize() {
 ```
 
 - **Device Pixel Ratio (DPR) Cap**: Clamped to $\min(\text{devicePixelRatio}, 2)$ to preserve fillrate performance on ultra-high-density mobile and desktop displays.
-- **Lifecycle Cleanup**: The `destroy()` method cleanly disposes of WebGL renderers, geometries, materials, and disconnects `ResizeObserver` and window resize listeners, preventing memory leaks during hot reload or fixture teardown.
+- **Lifecycle Cleanup**: The destroy path disposes the WebGL renderer and compiled materials, removes the canvas, and disconnects `ResizeObserver` and window resize listeners.
 
 ---
 
