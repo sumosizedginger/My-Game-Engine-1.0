@@ -3,7 +3,7 @@
  * Canonical repository: sumosizedginger/My-Game-Engine-1.0
  *
  * This module is the baseline runtime for ordinary exported games.
- * It intentionally contains no compiler, Kiln, or Forge dependencies.
+ * It intentionally contains no compiler, authoring, or Forge dependencies.
  */
 
 export const ENGINE_NAME = 'My Game Engine 1.0';
@@ -59,7 +59,7 @@ export function createDiagnosticReporter() {
 }
 
 /**
- * Instantiates a compiled artifact into a transient runtime object.
+ * Instantiates a pre-compiled artifact into a transient runtime object.
  * Follows Definition / Artifact / Runtime separation.
  *
  * @param {object} artifact - The compiled artifact to instantiate.

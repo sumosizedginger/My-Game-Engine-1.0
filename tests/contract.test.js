@@ -34,22 +34,23 @@ test('all 14 bootstrap documentation files exist in root and are non-empty', () 
   }
 });
 
-test('Node 24.19.0 is consistently pinned across .nvmrc, .node-version, and package.json', () => {
+test('Node 24.20.0 is consistently pinned across .nvmrc, .node-version, and package.json', () => {
   const nvmrc = fs.readFileSync(path.join(rootDir, '.nvmrc'), 'utf8').trim();
   const nodeVersion = fs.readFileSync(path.join(rootDir, '.node-version'), 'utf8').trim();
   const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 
-  assert.equal(nvmrc, '24.19.0', '.nvmrc must pin 24.19.0');
-  assert.equal(nodeVersion, '24.19.0', '.node-version must pin 24.19.0');
-  assert.equal(pkg.engines?.node, '24.19.0', 'package.json engines.node must pin 24.19.0');
+  assert.equal(nvmrc, '24.20.0', '.nvmrc must pin 24.20.0');
+  assert.equal(nodeVersion, '24.20.0', '.node-version must pin 24.20.0');
+  assert.equal(pkg.engines?.node, '24.20.0', 'package.json engines.node must pin 24.20.0');
 });
 
-test('package.json defines canonical identity and required exports', () => {
+test('package.json defines canonical identity, Vite 8.2.2 devDependency, and required exports', () => {
   const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 
   assert.equal(pkg.name, '@sumosizedginger/my-game-engine-1.0');
   assert.equal(pkg.type, 'module');
   assert.equal(pkg.repository?.url, 'https://github.com/sumosizedginger/My-Game-Engine-1.0.git');
+  assert.equal(pkg.devDependencies?.vite, '8.2.2');
 
   assert.equal(pkg.exports?.['.'], './src/index.js');
   assert.equal(pkg.exports?.['./runtime'], './src/runtime/index.js');
