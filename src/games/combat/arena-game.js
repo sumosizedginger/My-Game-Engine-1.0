@@ -80,9 +80,21 @@ export class ArenaCombatGame {
     this.input.bindKey('KeyJ', 'Attack');
     this.input.bindKey('KeyR', 'Reset');
 
-    if (this.input.bindGamepadButton) {
-      this.input.bindGamepadButton(0, 'Attack'); // A / Cross button
-      this.input.bindGamepadButton(3, 'Reset');  // Y / Triangle button
+    if (typeof this.input.bindGamepadButton === 'function') {
+      this.input.bindGamepadButton(0, 'Attack');       // Button South / A / Cross
+      this.input.bindGamepadButton(3, 'Reset');        // Button North / Y / Triangle
+      this.input.bindGamepadButton(8, 'Reset');        // Back / View / Select
+      this.input.bindGamepadButton(12, 'MoveForward'); // D-pad Up
+      this.input.bindGamepadButton(13, 'MoveBackward');// D-pad Down
+      this.input.bindGamepadButton(14, 'MoveLeft');    // D-pad Left
+      this.input.bindGamepadButton(15, 'MoveRight');   // D-pad Right
+    }
+
+    if (typeof this.input.bindGamepadAxis === 'function') {
+      // Left Stick X (axis 0): negative -> MoveLeft, positive -> MoveRight
+      this.input.bindGamepadAxis(0, 'MoveLeft', 'MoveRight', { deadzone: 0.25 });
+      // Left Stick Y (axis 1): negative -> MoveForward, positive -> MoveBackward
+      this.input.bindGamepadAxis(1, 'MoveForward', 'MoveBackward', { deadzone: 0.25 });
     }
   }
 

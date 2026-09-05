@@ -269,4 +269,74 @@ test('Combat Room — ArenaCombatGame Coordinator & Lifecycle', async (t) => {
     assert.ok(deltaZ > 1.5, `Player world transform must advance forward through input path (deltaZ: ${deltaZ})`);
     assert.equal(game.player.velocity.z, 0, 'Velocity returns to zero after releasing action');
   });
+
+  await t.test('ArenaCombatGame receives controller actions through captureSnapshot without hardware inspection', () => {
+    const game = new ArenaCombatGame();
+    const pad = {
+      axes: [0, 0],
+      buttons: Array.from({ length: 16 }, () => ({ pressed: false }))
+    };
+    game.input.setGamepad(pad);
+
+    const startX = game.player.transform.position.x;
+    const startZ = game.player.transform.position.z;
+
+    // 1. Stick forward (axes[1] = -0.85 < -0.25) -> MoveForward
+    pad.axes[1] = -0.85;
+    for (let i = 0; i < 40; i++) {
+      game.update(0.016);
+    }
+    pad.axes[1] = 0;
+    for (let i = 0; i < 5; i++) {
+      game.update(0.016);
+    }
+
+    const midZ = game.player.transform.position.z;
+    assert.ok(midZ > startZ + 1.0, `Player must advance forward via gamepad stick (start: ${startZ}, mid: ${midZ})`);
+
+    // 2. Stick right (axes[0] = +0.85 > +0.25) -> MoveRight
+    pad.axes[0] = 0.85;
+    for (let i = 0; i < 30; i++) {
+      game.update(0.016);
+    }
+    pad.axes[0] = 0;
+    for (let i = 0; i < 5; i++) {
+      game.update(0.016);
+    }
+
+    const endX = game.player.transform.position.x;
+    assert.ok(endX > startX + 0.5, `Player must move right via gamepad stick (start: ${startX}, end: ${endX})`);
+
+    // 3. Melee strike via Button South (0) -> Attack
+    game.player.transform.position.x = 0;
+    game.player.transform.position.z = 3.6;
+    game.enemy.transform.position.x = 0;
+    game.enemy.transform.position.z = 4.5;
+    game.player.cooldownTimer = 0;
+    game.player.attackTimer = -1;
+
+    pad.buttons[0].pressed = true; // Press Button South
+    game.update(0.016);            // Registers Attack action
+    pad.buttons[0].pressed = false;// Release button
+
+    // Step through the active strike window
+    for (let i = 0; i < 15; i++) {
+      game.update(0.016);
+    }
+
+    assert.equal(game.combatStats.playerHitsLanded, 1, 'Controller attack button landed a valid hit');
+    assert.equal(game.enemy.hp, 100 - COMBAT_CONFIG.player.attackDamage);
+
+    // 4. Reset via Button North (3) -> Reset
+    pad.buttons[3].pressed = true;
+    game.update(0.016);
+    pad.buttons[3].pressed = false;
+
+    assert.equal(game.state, COMBAT_STATES.READY);
+    assert.equal(game.player.transform.position.z, -4.5);
+    assert.equal(game.player.transform.position.x, 0);
+    assert.equal(game.player.hp, 100);
+    assert.equal(game.enemy.hp, 100);
+    assert.equal(game.combatStats.playerHitsLanded, 0);
+  });
 });

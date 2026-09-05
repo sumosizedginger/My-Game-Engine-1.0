@@ -136,7 +136,7 @@ Physical Devices (Keyboard, Gamepad)
 - `Pause`: Toggle simulation pause state.
 - `Reset`: Reset round or match.
 
-### 5.3 Device Bindings
+### 5.3 Device Bindings (Proof A Defaults)
 
 - **Keyboard**:
   - `MoveUp`: `KeyW`, `ArrowUp`
@@ -150,6 +150,27 @@ Physical Devices (Keyboard, Gamepad)
   - `Reset`: Button North (`button 3`), Back / Select (`button 8`)
 - **Programmatic Simulation**:
   - Headless test and evaluation harness injects actions directly (`simulateAction(action, active)`) without requiring physical hardware.
+
+### 5.4 Generic Controller Binding Interface
+
+The action-based input system exposes a generic binding layer for standard W3C Gamepad devices:
+
+- `bindGamepadButton(buttonIndex, action)`: Binds a physical button index (e.g. 0 for South/A) to a declared semantic action. Passing `null` unbinds the button.
+- `bindGamepadAxis(axisIndex, negativeAction, positiveAction, { deadzone })`: Binds an analog axis to bidirectional semantic actions (e.g. axis 0 for Left/Right, axis 1 for Forward/Backward) with a configurable deflection deadzone (default 0.4).
+- `setGamepad(mockGamepad)`: Injects a Gamepad-like object for headless test validation.
+- **Contract Enforcement**: Binding attempts to undeclared actions are strictly rejected with an error.
+
+### 5.5 Canonical Actions & Controller Mappings in Proof B2
+
+B2 declares combat actions: `MoveForward`, `MoveBackward`, `MoveLeft`, `MoveRight`, `Attack`, `Reset`.
+- **Keyboard**: `KeyW`/`ArrowUp` (Forward), `KeyS`/`ArrowDown` (Backward), `KeyA`/`ArrowLeft` (Left), `KeyD`/`ArrowRight` (Right), `Space`/`KeyJ` (Attack), `KeyR` (Reset).
+- **Gamepad / Controller**:
+  - `MoveForward`: Left Stick Forward (`axis 1 < -0.25`), D-Pad Up (`button 12`)
+  - `MoveBackward`: Left Stick Backward (`axis 1 > +0.25`), D-Pad Down (`button 13`)
+  - `MoveLeft`: Left Stick Left (`axis 0 < -0.25`), D-Pad Left (`button 14`)
+  - `MoveRight`: Left Stick Right (`axis 0 > +0.25`), D-Pad Right (`button 15`)
+  - `Attack`: Button South / A / Cross (`button 0`)
+  - `Reset`: Button North / Y / Triangle (`button 3`), Back / Select (`button 8`)
 
 ---
 

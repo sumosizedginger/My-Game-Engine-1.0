@@ -49,6 +49,11 @@ export function createB2Viewer({ container, isControlled = false }) {
     simulateAction: (action, active = true) => {
       game.input.simulateAction(action, active);
     },
+    setGamepad: (gamepad) => {
+      if (typeof game.input.setGamepad === 'function') {
+        game.input.setGamepad(gamepad);
+      }
+    },
     step: (dtMs = 16.666) => {
       const dt = dtMs * 0.001;
       game.update(dt);
