@@ -163,10 +163,21 @@ The action-based input system exposes a generic binding layer for standard W3C G
 ### 5.5 Canonical Actions & Controller Mappings in Proof B2
 
 B2 declares combat actions: `MoveForward`, `MoveBackward`, `MoveLeft`, `MoveRight`, `Attack`, `Reset`.
-- **Keyboard**: `KeyW`/`ArrowUp` (Forward), `KeyS`/`ArrowDown` (Backward), `KeyA`/`ArrowLeft` (Left), `KeyD`/`ArrowRight` (Right), `Space`/`KeyJ` (Attack), `KeyR` (Reset).
-- **Gamepad / Controller**:
-  - `MoveForward`: Left Stick Forward (`axis 1 < -0.25`), D-Pad Up (`button 12`)
-  - `MoveBackward`: Left Stick Backward (`axis 1 > +0.25`), D-Pad Down (`button 13`)
+
+> **Note on Directional Semantics**: The semantic action names `MoveForward` and `MoveBackward` are world/gameplay-direction names (+Z towards camera/enemy, -Z away from camera into the arena). For Proof B2's spectator camera (positioned at +Z looking toward -Z), the default input bindings are intentionally screen-space oriented:
+> - Pushing Up / away on screen binds to `MoveBackward` (character moves upward/away from camera on screen, -Z).
+> - Pushing Down / toward camera on screen binds to `MoveForward` (character moves downward/toward camera on screen, +Z).
+
+- **Keyboard**:
+  - `MoveBackward` (Up / away on screen): `KeyW`, `ArrowUp`
+  - `MoveForward` (Down / toward camera on screen): `KeyS`, `ArrowDown`
+  - `MoveLeft`: `KeyA`, `ArrowLeft`
+  - `MoveRight`: `KeyD`, `ArrowRight`
+  - `Attack`: `Space`, `KeyJ`
+  - `Reset`: `KeyR`
+- **Gamepad / Controller** (Deadzone: `0.25` for B2 axes):
+  - `MoveBackward`: Left Stick Y negative / pushed up (`axis 1 < -0.25`), D-Pad Up (`button 12`)
+  - `MoveForward`: Left Stick Y positive / pushed down (`axis 1 > +0.25`), D-Pad Down (`button 13`)
   - `MoveLeft`: Left Stick Left (`axis 0 < -0.25`), D-Pad Left (`button 14`)
   - `MoveRight`: Left Stick Right (`axis 0 > +0.25`), D-Pad Right (`button 15`)
   - `Attack`: Button South / A / Cross (`button 0`)
