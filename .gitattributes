@@ -1,0 +1,4 @@
+# Configure git attributes
+# Markdown uses trailing whitespace for line breaks (CommonMark standard)
+*.md -whitespace
+*.txt -whitespace

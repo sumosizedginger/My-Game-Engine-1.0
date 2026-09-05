@@ -1,0 +1,29 @@
+{
+  "name": "@sumosizedginger/my-game-engine-1.0",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Browser-first, code-native procedural game engine",
+  "author": "sumosizedginger",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sumosizedginger/My-Game-Engine-1.0.git"
+  },
+  "engines": {
+    "node": "24.19.0"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./runtime": "./src/runtime/index.js",
+    "./full": "./src/full/index.js"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.js"
+  },
+  "devDependencies": {
+    "vite": "^6.2.0"
+  }
+}

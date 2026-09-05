@@ -1,0 +1,33 @@
+MY GAME ENGINE 1.0 — COMPLETE DOCUMENTATION PACKAGE
+
+Canonical repository:
+sumosizedginger/My-Game-Engine-1.0
+
+ROOT — 12 canonical project documents:
+README.md
+CONSTITUTION.md
+PRD.md
+ARCHITECTURE.md
+CONTEXT.md
+ROADMAP.md
+AGENTS.md
+HANDOFF_PROTOCOL.md
+DEPENDENCY_POLICY.md
+DEFINITION_OF_DONE.md
+TESTING_AND_VALIDATION.md
+DOCUMENTATION_MAP.md
+
+ROOT — 2 model adapters, not independent authorities:
+CLAUDE.md
+GEMINI.md
+
+ops/ — noncanonical operational artifacts:
+DOCUMENTATION_AUDIT.md
+PHASE_0_BOOTSTRAP_WORK_ORDER.md
+
+delivery/ — packaging metadata:
+PACKAGE_CONTENTS.txt
+SHA256SUMS.txt
+
+The 14 root Markdown files are the repository bootstrap documentation set.
+The files under ops/ are operational aids and must not be treated as permanent project law.
