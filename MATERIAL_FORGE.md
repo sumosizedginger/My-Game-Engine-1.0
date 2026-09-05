@@ -47,19 +47,19 @@ Proof B2 establishes a curated, harmonious PBR material palette for both the pro
 
 ### 3.1 Arena Environment Materials
 
-- **`arenaFloor`**: Dark slate flagstone (`color: 0x1a202c`, `roughness: 0.82`, `metalness: 0.05`).
-- **`arenaWall`**: Deep charcoal perimeter wall (`color: 0x0f172a`, `roughness: 0.90`, `metalness: 0.02`).
-- **`arenaPillar`**: Weathered basalt column (`color: 0x334155`, `roughness: 0.70`, `metalness: 0.10`).
+- **`arenaFloor`**: Dark slate flagstone (`color: 0x1e2430`, `roughness: 0.82`, `metalness: 0.12`, `emissive: 0x000000`).
+- **`arenaWall`**: Deep charcoal perimeter wall (`color: 0x141820`, `roughness: 0.90`, `metalness: 0.05`, `emissive: 0x000000`).
+- **`arenaPillar`**: Weathered basalt column (`color: 0x283242`, `roughness: 0.72`, `metalness: 0.18`, `emissive: 0x000000`).
 
 ### 3.2 Dynamic Character Materials
 
-- **`playerClay`**: Athletic vibrant cobalt clay (`color: 0x2563eb`, `roughness: 0.55`, `metalness: 0.05`).
-- **`enemyClay`**: Heavy brute crimson clay (`color: 0xdc2626`, `roughness: 0.65`, `metalness: 0.05`).
+- **`playerClay`**: Athletic vibrant cobalt clay (`color: 0x3b82f6`, `roughness: 0.50`, `metalness: 0.15`, `emissive: 0x0b1e38`, `emissiveIntensity: 0.4`).
+- **`enemyClay`**: Heavy brute crimson clay (`color: 0xdc2626`, `roughness: 0.58`, `metalness: 0.10`, `emissive: 0x3b0a0a`, `emissiveIntensity: 0.4`).
 
 ### 3.3 Visual Diagnostic Materials
 
-- **`hitFlash`**: High-intensity impact flash (`color: 0xffffff`, `emissive: 0xffe066`, `emissiveIntensity: 4.0`).
-- **`attackVolume`**: Translucent debug attack volume sphere (`color: 0xf59e0b`, `roughness: 0.30`, `wireframe: true`).
+- **`hitFlash`**: High-intensity impact flash (`color: 0xffffff`, `roughness: 0.20`, `metalness: 0.00`, `emissive: 0xff3b30`, `emissiveIntensity: 2.5`).
+- **`attackVolume`**: Translucent debug attack volume indicator (`color: 0xf59e0b`, `roughness: 1.0`, `metalness: 0.0`, `emissive: 0xf59e0b`, `emissiveIntensity: 1.5`, `wireframe: true`).
 
 ---
 

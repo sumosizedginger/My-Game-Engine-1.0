@@ -104,6 +104,7 @@ export function buildBoxGeometry({
  * @param {object} [options.origin={x:0, y:0, z:0}] - Base center (Y=0 rests at origin.y).
  * @param {number} [options.regionId=0]
  * @param {number} [options.surfaceId=0]
+ * @param {boolean} [options.cappedBottom=false] - When true, closes bottom with flat cap. Default false for flush floor columns.
  * @returns {BufferGeometry}
  */
 export function buildCylinderGeometry({
@@ -113,7 +114,8 @@ export function buildCylinderGeometry({
   radialSegments = 16,
   origin = { x: 0, y: 0, z: 0 },
   regionId = GEOMETRY_REGIONS.ARENA_PILLAR_1,
-  surfaceId = SURFACE_TYPES.PILLAR
+  surfaceId = SURFACE_TYPES.PILLAR,
+  cappedBottom = false
 } = {}) {
   const ox = origin.x || 0;
   const oy = origin.y || 0;
@@ -182,6 +184,31 @@ export function buildCylinderGeometry({
 
   for (let s = 0; s < radialSegments; s++) {
     indices.push(topCenterIdx, topStartIdx + s + 1, topStartIdx + s);
+  }
+
+  // 3. Optional Bottom Cap (default false to avoid coplanar floor z-fighting)
+  if (cappedBottom) {
+    const bottomCenterIdx = positions.length / 3;
+    positions.push(ox, oy, oz);
+    normals.push(0, -1, 0);
+    uvs.push(0.5, 0.5);
+    regionIds.push(regionId);
+    surfaceIds.push(surfaceId);
+
+    const bottomStartIdx = positions.length / 3;
+    for (let s = 0; s <= radialSegments; s++) {
+      const u = s / radialSegments;
+      const theta = u * Math.PI * 2;
+      positions.push(ox + radiusBottom * Math.cos(theta), oy, oz + radiusBottom * Math.sin(theta));
+      normals.push(0, -1, 0);
+      uvs.push(0.5 + 0.5 * Math.cos(theta), 0.5 + 0.5 * Math.sin(theta));
+      regionIds.push(regionId);
+      surfaceIds.push(surfaceId);
+    }
+
+    for (let s = 0; s < radialSegments; s++) {
+      indices.push(bottomCenterIdx, bottomStartIdx + s, bottomStartIdx + s + 1);
+    }
   }
 
   const geometry = new BufferGeometry();

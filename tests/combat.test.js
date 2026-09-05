@@ -242,4 +242,31 @@ test('Combat Room — ArenaCombatGame Coordinator & Lifecycle', async (t) => {
     assert.equal(game.combatStats.playerHitsLanded, 0);
     assert.equal(game.player.transform.position.z, -4.5);
   });
+
+  await t.test('player moves forward through real input/action simulation and authoritative integration', () => {
+    const game = new ArenaCombatGame();
+    const startZ = game.player.transform.position.z;
+
+    // Simulate real MoveForward action through accepted InputSystem
+    game.input.simulateAction('MoveForward', true);
+
+    // Step fixed simulation ticks
+    for (let i = 0; i < 60; i++) {
+      game.update(0.016);
+    }
+
+    // Release action
+    game.input.simulateAction('MoveForward', false);
+
+    // Step a couple ticks to resolve release
+    for (let i = 0; i < 5; i++) {
+      game.update(0.016);
+    }
+
+    const endZ = game.player.transform.position.z;
+    const deltaZ = endZ - startZ;
+
+    assert.ok(deltaZ > 1.5, `Player world transform must advance forward through input path (deltaZ: ${deltaZ})`);
+    assert.equal(game.player.velocity.z, 0, 'Velocity returns to zero after releasing action');
+  });
 });

@@ -46,14 +46,8 @@ export function createB2Viewer({ container, isControlled = false }) {
       game.triggerAttack();
       return game.getStateSnapshot();
     },
-    setPlayerVelocity: (vx, vz) => {
-      game.player.velocity.x = vx;
-      game.player.velocity.z = vz;
-      game.player.speed = Math.hypot(vx, vz);
-      if (game.player.speed > 0.001) {
-        game.player.transform.rotationY = Math.atan2(vx, vz);
-        if (game.state === COMBAT_STATES.READY) game.state = COMBAT_STATES.ENGAGED;
-      }
+    simulateAction: (action, active = true) => {
+      game.input.simulateAction(action, active);
     },
     step: (dtMs = 16.666) => {
       const dt = dtMs * 0.001;

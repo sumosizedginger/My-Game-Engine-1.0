@@ -8,12 +8,16 @@ import assert from 'node:assert/strict';
 
 import {
   createRoomDefinition,
+  resolveRoomParameters,
   buildBoxGeometry,
   buildCylinderGeometry,
   generateProceduralRoom,
   SURFACE_TYPES,
+  SURFACE_NAMES,
   CONSTRAINT_FLAGS,
-  GEOMETRY_REGIONS
+  GEOMETRY_REGIONS,
+  ROOM_PARAMETER_BOUNDS,
+  PILLAR_PARAMETER_BOUNDS
 } from '../src/geometry/index.js';
 
 test('Geometry Forge — Room Definition & Parameters', async (t) => {
@@ -158,5 +162,77 @@ test('Geometry Forge — Procedural Room & Collision Single-Truth Derivation', a
 
     const p1 = room.collision.pillars[0];
     assert.equal(room.collision.isWalkable(p1.x, p1.z, 0.4), false, 'inside pillar is not walkable');
+  });
+
+  await t.test('reconciled semantic enums match durable canonical spec contract', () => {
+    // SURFACE_TYPES
+    assert.equal(SURFACE_TYPES.FLOOR, 1);
+    assert.equal(SURFACE_TYPES.WALL, 2);
+    assert.equal(SURFACE_TYPES.PILLAR, 3);
+    assert.equal(SURFACE_TYPES.OBSTACLE, 4);
+    assert.equal(SURFACE_TYPES.CEILING, 5);
+
+    // SURFACE_NAMES
+    assert.equal(SURFACE_NAMES[1], 'floor');
+    assert.equal(SURFACE_NAMES[2], 'wall');
+    assert.equal(SURFACE_NAMES[3], 'pillar');
+    assert.equal(SURFACE_NAMES[4], 'obstacle');
+    assert.equal(SURFACE_NAMES[5], 'ceiling');
+
+    // CONSTRAINT_FLAGS
+    assert.equal(CONSTRAINT_FLAGS.NONE, 0);
+    assert.equal(CONSTRAINT_FLAGS.WALKABLE, 1);
+    assert.equal(CONSTRAINT_FLAGS.SOLID, 2);
+    assert.equal(CONSTRAINT_FLAGS.PERIMETER, 4);
+    assert.equal(CONSTRAINT_FLAGS.CLIMBABLE, 8);
+    assert.equal(CONSTRAINT_FLAGS.DESTRUCTIBLE, 16);
+
+    // GEOMETRY_REGIONS
+    assert.equal(GEOMETRY_REGIONS.ARENA_FLOOR, 10);
+    assert.equal(GEOMETRY_REGIONS.ARENA_WALL_NORTH, 20);
+    assert.equal(GEOMETRY_REGIONS.ARENA_WALL_SOUTH, 21);
+    assert.equal(GEOMETRY_REGIONS.ARENA_WALL_EAST, 22);
+    assert.equal(GEOMETRY_REGIONS.ARENA_WALL_WEST, 23);
+    assert.equal(GEOMETRY_REGIONS.ARENA_PILLAR_1, 30);
+    assert.equal(GEOMETRY_REGIONS.ARENA_PILLAR_2, 31);
+    assert.equal(GEOMETRY_REGIONS.ARENA_FEATURE, 40);
+  });
+
+  await t.test('PILLAR_PARAMETER_BOUNDS validates and clamps pillar dimensions', () => {
+    assert.equal(PILLAR_PARAMETER_BOUNDS.radius.min, 0.3);
+    assert.equal(PILLAR_PARAMETER_BOUNDS.radius.max, 2.0);
+    assert.equal(PILLAR_PARAMETER_BOUNDS.radius.default, 0.75);
+    assert.equal(PILLAR_PARAMETER_BOUNDS.height.min, 1.0);
+    assert.equal(PILLAR_PARAMETER_BOUNDS.height.max, 8.0);
+    assert.equal(PILLAR_PARAMETER_BOUNDS.height.default, 3.5);
+
+    const { parameters, diagnostics } = resolveRoomParameters({
+      pillars: [
+        { id: 'p_extreme', x: 0, z: 0, radius: 99.0, height: 0.1 }
+      ]
+    });
+
+    assert.equal(parameters.pillars[0].radius, 2.0);
+    assert.equal(parameters.pillars[0].height, 1.0);
+    assert.ok(diagnostics.some((d) => d.code === 'GEO_PILLAR_CLAMPED_MAX'));
+    assert.ok(diagnostics.some((d) => d.code === 'GEO_PILLAR_CLAMPED_MIN'));
+  });
+
+  await t.test('buildCylinderGeometry supports open-bottom default and optional cappedBottom', () => {
+    // Default open-bottom: eliminates coplanar z-fighting with floor
+    const openCyl = buildCylinderGeometry({ radialSegments: 16, cappedBottom: false });
+    // Side: 16 * 6 = 96 indices. Top cap: 16 * 3 = 48 indices. Total = 144.
+    assert.equal(openCyl.getIndex().count, 144);
+
+    // Explicit capped-bottom: adds bottom cap (48 indices -> 192 total)
+    const closedCyl = buildCylinderGeometry({ radialSegments: 16, cappedBottom: true });
+    assert.equal(closedCyl.getIndex().count, 192);
+
+    // Verify bottom cap center normal is -Y
+    const normals = closedCyl.getAttribute('normal');
+    // The bottom center is vertex (posCount - (1 + radialSegments + 1))
+    // Bottom center was pushed at index posCount - 18
+    const botCenterIdx = closedCyl.getAttribute('position').count - 18;
+    assert.equal(normals.getY(botCenterIdx), -1);
   });
 });

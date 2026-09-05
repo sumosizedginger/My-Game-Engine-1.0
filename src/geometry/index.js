@@ -15,6 +15,7 @@ export {
 
 export {
   ROOM_PARAMETER_BOUNDS,
+  PILLAR_PARAMETER_BOUNDS,
   ROOM_PRESETS,
   resolveRoomParameters,
   createRoomDefinition

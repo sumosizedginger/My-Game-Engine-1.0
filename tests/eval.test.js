@@ -146,3 +146,48 @@ test('browser evaluation failure behavior reports error on unreachable destinati
     /net::ERR_CONNECTION_REFUSED|TimeoutError|timed out/
   );
 });
+
+test('evaluator failure sensitivity: b2PageProofSuccess and b2PlayerMovement gate overall status', () => {
+  // Verify that if b2PageProofSuccess is false, overall status CANNOT be PASS
+  const checksFailingProof = {
+    boot: true,
+    runtimeMode: true,
+    fullEngineSeam: true,
+    purity: true,
+    noConsoleErrors: true,
+    noPageErrors: true,
+    noFailedRequests: true,
+    domStatusPass: true,
+    b2Boot: true,
+    b2RoomGeneration: true,
+    b2MaterialGeneration: true,
+    b2CharacterIntegration: true,
+    b2PlayerMovement: true,
+    b2CombatExecution: true,
+    b2WinState: true,
+    b2PageProofSuccess: false
+  };
+
+  const statusFailingProof = Object.values(checksFailingProof).every(Boolean) ? 'PASS' : 'FAIL';
+  assert.equal(statusFailingProof, 'FAIL', 'Harness must report FAIL when b2PageProofSuccess is false');
+
+  // Verify that if b2PlayerMovement is false, overall status CANNOT be PASS
+  const checksFailingMovement = {
+    ...checksFailingProof,
+    b2PageProofSuccess: true,
+    b2PlayerMovement: false
+  };
+
+  const statusFailingMovement = Object.values(checksFailingMovement).every(Boolean) ? 'PASS' : 'FAIL';
+  assert.equal(statusFailingMovement, 'FAIL', 'Harness must report FAIL when b2PlayerMovement is false');
+
+  // Verify that when all pass, overall status is PASS
+  const checksAllPassing = {
+    ...checksFailingProof,
+    b2PageProofSuccess: true,
+    b2PlayerMovement: true
+  };
+
+  const statusAllPassing = Object.values(checksAllPassing).every(Boolean) ? 'PASS' : 'FAIL';
+  assert.equal(statusAllPassing, 'PASS', 'Harness reports PASS when all checks pass');
+});

@@ -329,29 +329,35 @@ export function runBrowserEvaluation({
             }
             const b2 = window.__PROOF_B2_COMBAT__;
             const initial = b2.getStateSnapshot();
+            const startPosition = { ...initial.player.position };
 
             // 1. Initial generation checks (Room geometry, materials, character skeletons)
             const hasRoomGeometry = b2.hasRoomGeometry && b2.vertexCount > 50 && b2.triangleCount > 50;
             const hasMaterials = b2.hasMaterials;
             const hasCharacters = b2.hasCharacters;
 
-            // 2. Controlled movement towards enemy
+            // 2. Controlled movement towards enemy via real action/input system
             // Player starts at Z = -4.5, Enemy at Z = +4.5. Advance player along +Z into melee range
-            b2.setPlayerVelocity(0, 3.2);
-            for (let i = 0; i < 70; i++) {
-              b2.step(25);
+            b2.simulateAction('MoveForward', true);
+            for (let i = 0; i < 75; i++) {
+              b2.step(16.666);
             }
-            b2.setPlayerVelocity(0, 0);
+            b2.simulateAction('MoveForward', false);
+            for (let i = 0; i < 5; i++) {
+              b2.step(16.666);
+            }
 
             const movedSnapshot = b2.getStateSnapshot();
-            const playerMovedForward = movedSnapshot.player.position.z > initial.player.position.z;
+            const endPosition = { ...movedSnapshot.player.position };
+            const movementDelta = endPosition.z - startPosition.z;
+            const playerMovedForward = movementDelta > 1.5;
 
             // 3. Controlled Combat Strike & Single Hit Authority Resolution
             b2.triggerAttack();
             let fistSampleCoherent = false;
 
             for (let i = 0; i < 30; i++) {
-              b2.step(25);
+              b2.step(16.666);
               const snap = b2.getStateSnapshot();
               if (snap.combatStats.lastFistCoherence && snap.combatStats.lastFistCoherence.coherent) {
                 fistSampleCoherent = true;
@@ -363,7 +369,7 @@ export function runBrowserEvaluation({
             for (let round = 0; round < 6; round++) {
               b2.triggerAttack();
               for (let i = 0; i < 35; i++) {
-                b2.step(25);
+                b2.step(16.666);
                 const s = b2.getStateSnapshot();
                 if (s.state === 'VICTORY' || s.enemy.hp <= 0) {
                   victoryAchieved = true;
@@ -394,9 +400,12 @@ export function runBrowserEvaluation({
                 b2RoomGeneration: hasRoomGeometry,
                 b2MaterialGeneration: hasMaterials,
                 b2CharacterIntegration: hasCharacters,
+                b2PlayerMovement: playerMovedForward,
                 b2CombatExecution: hitsLanded && damageDealt,
                 b2WinState: victoryAchieved,
-                playerMovedForward,
+                startPosition,
+                endPosition,
+                movementDelta,
                 fistSampleCoherent,
                 vertexCount: b2.vertexCount,
                 triangleCount: b2.triangleCount,

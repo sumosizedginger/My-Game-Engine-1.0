@@ -55,16 +55,53 @@ test('Material Forge — Definition & Parameters', async (t) => {
     assert.ok(invalidMat.diagnostics.some((d) => d.code === 'MAT_INVALID_COLOR'));
   });
 
-  await t.test('verifies all standard MATERIAL_PRESETS', () => {
-    const presetKeys = ['arenaFloor', 'arenaWall', 'arenaPillar', 'playerClay', 'enemyClay', 'hitFlash', 'attackVolume'];
-    for (const key of presetKeys) {
-      const preset = MATERIAL_PRESETS[key];
-      assert.ok(preset, `preset ${key} exists`);
-      assert.equal(preset.type, 'material');
-      assert.ok(typeof preset.data.parameters.color === 'number');
-      assert.ok(preset.data.parameters.roughness >= 0 && preset.data.parameters.roughness <= 1);
-      assert.ok(preset.data.parameters.metalness >= 0 && preset.data.parameters.metalness <= 1);
-    }
+  await t.test('verifies exact canonical parameter values for all 7 standard MATERIAL_PRESETS', () => {
+    // 1. arenaFloor
+    assert.equal(MATERIAL_PRESETS.arenaFloor.data.parameters.color, 0x1e2430);
+    assert.equal(MATERIAL_PRESETS.arenaFloor.data.parameters.roughness, 0.82);
+    assert.equal(MATERIAL_PRESETS.arenaFloor.data.parameters.metalness, 0.12);
+    assert.equal(MATERIAL_PRESETS.arenaFloor.data.parameters.emissive, 0x000000);
+
+    // 2. arenaWall
+    assert.equal(MATERIAL_PRESETS.arenaWall.data.parameters.color, 0x141820);
+    assert.equal(MATERIAL_PRESETS.arenaWall.data.parameters.roughness, 0.90);
+    assert.equal(MATERIAL_PRESETS.arenaWall.data.parameters.metalness, 0.05);
+    assert.equal(MATERIAL_PRESETS.arenaWall.data.parameters.emissive, 0x000000);
+
+    // 3. arenaPillar
+    assert.equal(MATERIAL_PRESETS.arenaPillar.data.parameters.color, 0x283242);
+    assert.equal(MATERIAL_PRESETS.arenaPillar.data.parameters.roughness, 0.72);
+    assert.equal(MATERIAL_PRESETS.arenaPillar.data.parameters.metalness, 0.18);
+    assert.equal(MATERIAL_PRESETS.arenaPillar.data.parameters.emissive, 0x000000);
+
+    // 4. playerClay
+    assert.equal(MATERIAL_PRESETS.playerClay.data.parameters.color, 0x3b82f6);
+    assert.equal(MATERIAL_PRESETS.playerClay.data.parameters.roughness, 0.50);
+    assert.equal(MATERIAL_PRESETS.playerClay.data.parameters.metalness, 0.15);
+    assert.equal(MATERIAL_PRESETS.playerClay.data.parameters.emissive, 0x0b1e38);
+    assert.equal(MATERIAL_PRESETS.playerClay.data.parameters.emissiveIntensity, 0.4);
+
+    // 5. enemyClay
+    assert.equal(MATERIAL_PRESETS.enemyClay.data.parameters.color, 0xdc2626);
+    assert.equal(MATERIAL_PRESETS.enemyClay.data.parameters.roughness, 0.58);
+    assert.equal(MATERIAL_PRESETS.enemyClay.data.parameters.metalness, 0.10);
+    assert.equal(MATERIAL_PRESETS.enemyClay.data.parameters.emissive, 0x3b0a0a);
+    assert.equal(MATERIAL_PRESETS.enemyClay.data.parameters.emissiveIntensity, 0.4);
+
+    // 6. hitFlash
+    assert.equal(MATERIAL_PRESETS.hitFlash.data.parameters.color, 0xffffff);
+    assert.equal(MATERIAL_PRESETS.hitFlash.data.parameters.roughness, 0.20);
+    assert.equal(MATERIAL_PRESETS.hitFlash.data.parameters.metalness, 0.00);
+    assert.equal(MATERIAL_PRESETS.hitFlash.data.parameters.emissive, 0xff3b30);
+    assert.equal(MATERIAL_PRESETS.hitFlash.data.parameters.emissiveIntensity, 2.5);
+
+    // 7. attackVolume
+    assert.equal(MATERIAL_PRESETS.attackVolume.data.parameters.color, 0xf59e0b);
+    assert.equal(MATERIAL_PRESETS.attackVolume.data.parameters.roughness, 1.0);
+    assert.equal(MATERIAL_PRESETS.attackVolume.data.parameters.metalness, 0.0);
+    assert.equal(MATERIAL_PRESETS.attackVolume.data.parameters.emissive, 0xf59e0b);
+    assert.equal(MATERIAL_PRESETS.attackVolume.data.parameters.emissiveIntensity, 1.5);
+    assert.equal(MATERIAL_PRESETS.attackVolume.data.parameters.wireframe, true);
   });
 });
 

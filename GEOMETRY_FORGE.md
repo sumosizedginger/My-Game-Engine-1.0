@@ -28,7 +28,10 @@ Room parameters are strictly validated and clamped against the `ROOM_PARAMETER_B
 
 ### 2.1 Bounded Parameter Domain
 
+Room parameters and pillar parameters are strictly validated and clamped against their canonical schema bounds:
+
 ```text
+Room Parameter (ROOM_PARAMETER_BOUNDS)
 Parameter           Min       Max       Default    Unit
 -----------------------------------------------------------------
 width               8.0       48.0      16.0       meters (X axis)
@@ -36,8 +39,12 @@ depth               8.0       48.0      16.0       meters (Z axis)
 wallHeight          2.0       8.0       3.5        meters (Y axis)
 wallThickness       0.2       1.5       0.4        meters
 floorThickness      0.1       1.0       0.3        meters
-pillarRadius        0.3       2.0       0.75       meters
-pillarHeight        1.0       wallHeight           meters
+
+Pillar Parameter (PILLAR_PARAMETER_BOUNDS)
+Parameter           Min       Max       Default    Unit
+-----------------------------------------------------------------
+radius              0.3       2.0       0.75       meters
+height              1.0       8.0       3.5        meters (clamped to wallHeight)
 ```
 
 ### 2.2 Standard Presets
@@ -58,31 +65,48 @@ export const SURFACE_TYPES = Object.freeze({
   FLOOR: 1,      // Walkable horizontal floor slab
   WALL: 2,       // Solid vertical barrier
   PILLAR: 3,     // Cylindrical interior structural column
-  OBSTACLE: 4    // General gameplay barrier
+  OBSTACLE: 4,   // General gameplay barrier
+  CEILING: 5     // Overhead boundary surface
+});
+
+export const SURFACE_NAMES = Object.freeze({
+  [SURFACE_TYPES.FLOOR]: 'floor',
+  [SURFACE_TYPES.WALL]: 'wall',
+  [SURFACE_TYPES.PILLAR]: 'pillar',
+  [SURFACE_TYPES.OBSTACLE]: 'obstacle',
+  [SURFACE_TYPES.CEILING]: 'ceiling'
 });
 ```
 
 ### 3.2 Constraint Flags
 
+Bitmask flags controlling traversal, physics, and gameplay interactions:
+
 ```javascript
 export const CONSTRAINT_FLAGS = Object.freeze({
-  WALKABLE: 1 << 0,  // Characters can traverse
-  SOLID: 1 << 1,     // Blocks translation and projectiles
-  PERIMETER: 1 << 2  // Defines enclosing world boundary
+  NONE: 0,
+  WALKABLE: 1 << 0,     // Characters can traverse (e.g. floor)
+  SOLID: 1 << 1,        // Blocks translation and projectiles
+  PERIMETER: 1 << 2,    // Defines enclosing room boundary
+  CLIMBABLE: 1 << 3,    // Traversable vertical surface
+  DESTRUCTIBLE: 1 << 4  // Targetable breakable barrier
 });
 ```
 
 ### 3.3 Semantic Region Identifiers
 
+Durable numeric region tags assigned to distinct architectural room features:
+
 ```javascript
 export const GEOMETRY_REGIONS = Object.freeze({
-  ARENA_FLOOR: 1,
-  ARENA_WALL_NORTH: 2,
-  ARENA_WALL_SOUTH: 3,
-  ARENA_WALL_EAST: 4,
-  ARENA_WALL_WEST: 5,
-  ARENA_PILLAR_1: 6,
-  ARENA_PILLAR_2: 7
+  ARENA_FLOOR: 10,
+  ARENA_WALL_NORTH: 20,
+  ARENA_WALL_SOUTH: 21,
+  ARENA_WALL_EAST: 22,
+  ARENA_WALL_WEST: 23,
+  ARENA_PILLAR_1: 30,
+  ARENA_PILLAR_2: 31,
+  ARENA_FEATURE: 40
 });
 ```
 
@@ -112,7 +136,7 @@ export const GEOMETRY_REGIONS = Object.freeze({
 
 - Floor slab top surface sits precisely at ground datum $Y = 0.000\text{m}$.
 - Perimeter walls span the room perimeter with thickness $T$, leaving an interior walkable expanse of $(W - 2T) \times (D - 2T)$.
-- Cylindrical pillars are generated with smooth radial segments and flat end caps.
+- Cylindrical pillars are generated with smooth radial segments, a flat top cap, and an open bottom (`cappedBottom: false` by default) to eliminate redundant hidden polygons and coplanar z-fighting against the floor slab datum ($Y = 0.000\text{m}$). Closed bottom caps can be explicitly enabled via `cappedBottom: true` on the cylinder primitive.
 - Vertex attributes include `position` (3 floats), `normal` (3 floats), `uv` (2 floats), `regionId` (1 float), and `surfaceId` (1 float).
 - Sub-geometries merge into a single efficient draw call with index offsets preserved.
 

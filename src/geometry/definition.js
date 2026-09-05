@@ -15,6 +15,11 @@ export const ROOM_PARAMETER_BOUNDS = Object.freeze({
   floorThickness: { min: 0.1, max: 1.0, default: 0.3 }    // Floor slab thickness below ground (meters)
 });
 
+export const PILLAR_PARAMETER_BOUNDS = Object.freeze({
+  radius: { min: 0.3, max: 2.0, default: 0.75 },          // Column radius (meters)
+  height: { min: 1.0, max: 8.0, default: 3.5 }            // Column height (meters)
+});
+
 export const ROOM_PRESETS = Object.freeze({
   combat_arena: Object.freeze({
     width: 16.0,
@@ -96,13 +101,50 @@ export function resolveRoomParameters(input = 'combat_arena') {
 
   // Preserve sanitized pillars
   resolved.pillars = Array.isArray(baseParams.pillars)
-    ? baseParams.pillars.map((p, idx) => ({
-        id: p.id || `pillar_${idx + 1}`,
-        x: typeof p.x === 'number' ? p.x : 0,
-        z: typeof p.z === 'number' ? p.z : 0,
-        radius: typeof p.radius === 'number' ? Math.max(0.3, Math.min(2.0, p.radius)) : 0.75,
-        height: typeof p.height === 'number' ? Math.max(1.0, Math.min(resolved.wallHeight, p.height)) : resolved.wallHeight
-      }))
+    ? baseParams.pillars.map((p, idx) => {
+        let radius = typeof p.radius === 'number' ? p.radius : PILLAR_PARAMETER_BOUNDS.radius.default;
+        if (radius < PILLAR_PARAMETER_BOUNDS.radius.min) {
+          diagnostics.push({
+            severity: 'WARN',
+            code: 'GEO_PILLAR_CLAMPED_MIN',
+            message: `Pillar "${p.id || idx + 1}" radius (${radius}) below min (${PILLAR_PARAMETER_BOUNDS.radius.min}), clamping`
+          });
+          radius = PILLAR_PARAMETER_BOUNDS.radius.min;
+        } else if (radius > PILLAR_PARAMETER_BOUNDS.radius.max) {
+          diagnostics.push({
+            severity: 'WARN',
+            code: 'GEO_PILLAR_CLAMPED_MAX',
+            message: `Pillar "${p.id || idx + 1}" radius (${radius}) above max (${PILLAR_PARAMETER_BOUNDS.radius.max}), clamping`
+          });
+          radius = PILLAR_PARAMETER_BOUNDS.radius.max;
+        }
+
+        let height = typeof p.height === 'number' ? p.height : resolved.wallHeight;
+        const maxHeight = Math.min(PILLAR_PARAMETER_BOUNDS.height.max, resolved.wallHeight);
+        if (height < PILLAR_PARAMETER_BOUNDS.height.min) {
+          diagnostics.push({
+            severity: 'WARN',
+            code: 'GEO_PILLAR_CLAMPED_MIN',
+            message: `Pillar "${p.id || idx + 1}" height (${height}) below min (${PILLAR_PARAMETER_BOUNDS.height.min}), clamping`
+          });
+          height = PILLAR_PARAMETER_BOUNDS.height.min;
+        } else if (height > maxHeight) {
+          diagnostics.push({
+            severity: 'WARN',
+            code: 'GEO_PILLAR_CLAMPED_MAX',
+            message: `Pillar "${p.id || idx + 1}" height (${height}) above max (${maxHeight}), clamping`
+          });
+          height = maxHeight;
+        }
+
+        return {
+          id: p.id || `pillar_${idx + 1}`,
+          x: typeof p.x === 'number' ? p.x : 0,
+          z: typeof p.z === 'number' ? p.z : 0,
+          radius,
+          height
+        };
+      })
     : [];
 
   return {

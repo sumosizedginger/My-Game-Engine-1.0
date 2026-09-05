@@ -250,8 +250,10 @@ export async function runEvaluation(options = {}) {
       checks.b2RoomGeneration = Boolean(b2Result.b2Proof?.checks?.b2RoomGeneration);
       checks.b2MaterialGeneration = Boolean(b2Result.b2Proof?.checks?.b2MaterialGeneration);
       checks.b2CharacterIntegration = Boolean(b2Result.b2Proof?.checks?.b2CharacterIntegration);
+      checks.b2PlayerMovement = Boolean(b2Result.b2Proof?.checks?.b2PlayerMovement);
       checks.b2CombatExecution = Boolean(b2Result.b2Proof?.checks?.b2CombatExecution);
       checks.b2WinState = Boolean(b2Result.b2Proof?.checks?.b2WinState);
+      checks.b2PageProofSuccess = Boolean(b2Result.b2Proof?.success);
 
       if (b2Result.consoleErrors.length > 0) checks.noConsoleErrors = false;
       if (b2Result.pageErrors.length > 0) checks.noPageErrors = false;
@@ -269,8 +271,10 @@ export async function runEvaluation(options = {}) {
       checks.b2RoomGeneration = Boolean(browserResult.b2Proof.checks?.b2RoomGeneration);
       checks.b2MaterialGeneration = Boolean(browserResult.b2Proof.checks?.b2MaterialGeneration);
       checks.b2CharacterIntegration = Boolean(browserResult.b2Proof.checks?.b2CharacterIntegration);
+      checks.b2PlayerMovement = Boolean(browserResult.b2Proof.checks?.b2PlayerMovement);
       checks.b2CombatExecution = Boolean(browserResult.b2Proof.checks?.b2CombatExecution);
       checks.b2WinState = Boolean(browserResult.b2Proof.checks?.b2WinState);
+      checks.b2PageProofSuccess = Boolean(browserResult.b2Proof.success);
       if (browserResult.b2Proof.diagnosticsRecords) {
         rawDiagnostics.push(...browserResult.b2Proof.diagnosticsRecords);
       }
