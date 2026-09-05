@@ -37,6 +37,45 @@ export const DEFAULT_GAMEPAD_AXIS_BINDINGS = Object.freeze([
 ]);
 
 /**
+ * Pure helper to select an active, connected Gamepad from a GamepadList or array.
+ * Scans all available slots (ignoring null/stale entries) and preserves stable selection
+ * while the preferred gamepad remains connected.
+ *
+ * @param {Array<object|null>} [gamepads=[]] - Slot array from navigator.getGamepads().
+ * @param {number|null} [preferredIndex=null] - Index of currently locked gamepad to retain stability.
+ * @returns {object|null} The selected active gamepad or null if none connected.
+ */
+export function selectActiveGamepad(gamepads, preferredIndex = null) {
+  if (!gamepads || typeof gamepads.length !== 'number') {
+    return null;
+  }
+
+  // 1. If preferredIndex is valid and that slot is still populated and connected, retain it
+  if (preferredIndex !== null && Number.isInteger(preferredIndex) && preferredIndex >= 0 && preferredIndex < gamepads.length) {
+    const pad = gamepads[preferredIndex];
+    if (pad && pad.connected !== false) {
+      return pad;
+    }
+  }
+
+  // 2. Otherwise scan all slots for the first non-null, connected gamepad
+  for (let i = 0; i < gamepads.length; i++) {
+    const pad = gamepads[i];
+    if (pad && pad.connected !== false) {
+      return pad;
+    }
+  }
+
+  return null;
+}
+
+function isDefaultProofAActions(act) {
+  if (act === DEFAULT_ACTIONS) return true;
+  if (!Array.isArray(act) || act.length !== DEFAULT_ACTIONS.length) return false;
+  return DEFAULT_ACTIONS.every((a, idx) => act[idx] === a);
+}
+
+/**
  * Creates an action-based input manager.
  *
  * @param {object} [options={}] - Options.
@@ -57,10 +96,11 @@ export function createInputSystem({
   const gamepadButtonMap = new Map();
   const gamepadAxisMap = new Map();
 
-  // Populate initial gamepad button bindings
+  // Populate initial gamepad button bindings (content-safe check for Proof A defaults)
+  const isProofA = isDefaultProofAActions(actions);
   const initialButtons = gamepadButtonBindings !== null
     ? gamepadButtonBindings
-    : (actions === DEFAULT_ACTIONS ? DEFAULT_GAMEPAD_BUTTON_BINDINGS : {});
+    : (isProofA ? DEFAULT_GAMEPAD_BUTTON_BINDINGS : {});
 
   for (const [btnIndex, action] of Object.entries(initialButtons)) {
     if (declaredActions.has(action)) {
@@ -68,10 +108,10 @@ export function createInputSystem({
     }
   }
 
-  // Populate initial gamepad axis bindings
+  // Populate initial gamepad axis bindings (content-safe check for Proof A defaults)
   const initialAxes = gamepadAxisBindings !== null
     ? gamepadAxisBindings
-    : (actions === DEFAULT_ACTIONS ? DEFAULT_GAMEPAD_AXIS_BINDINGS : []);
+    : (isProofA ? DEFAULT_GAMEPAD_AXIS_BINDINGS : []);
 
   for (const binding of initialAxes) {
     if ((!binding.negativeAction || declaredActions.has(binding.negativeAction)) &&
@@ -89,6 +129,28 @@ export function createInputSystem({
   const rawKeyStates = new Map();
   const simulatedActions = new Map();
   let activeGamepad = null;
+  let preferredGamepadIndex = null;
+
+  function getLiveGamepad() {
+    if (activeGamepad) {
+      return activeGamepad;
+    }
+    if (typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function') {
+      let rawPads;
+      try {
+        rawPads = navigator.getGamepads();
+      } catch {
+        rawPads = null;
+      }
+      const selected = selectActiveGamepad(rawPads, preferredGamepadIndex);
+      if (selected) {
+        preferredGamepadIndex = typeof selected.index === 'number' ? selected.index : null;
+        return selected;
+      }
+      preferredGamepadIndex = null;
+    }
+    return null;
+  }
 
   // Track key down and up
   function onKeyDown(event) {
@@ -97,6 +159,20 @@ export function createInputSystem({
 
   function onKeyUp(event) {
     rawKeyStates.set(event.code, false);
+  }
+
+  function onGamepadConnected(event) {
+    if (event && event.gamepad && event.gamepad.connected !== false) {
+      if (preferredGamepadIndex === null) {
+        preferredGamepadIndex = typeof event.gamepad.index === 'number' ? event.gamepad.index : null;
+      }
+    }
+  }
+
+  function onGamepadDisconnected(event) {
+    if (event && event.gamepad && event.gamepad.index === preferredGamepadIndex) {
+      preferredGamepadIndex = null;
+    }
   }
 
   return {
@@ -188,25 +264,104 @@ export function createInputSystem({
     handleKeyUp: onKeyUp,
 
     /**
-     * Attaches listener to a window or element.
+     * Attaches listeners to a window or event target.
      */
     attach(target) {
       if (target && typeof target.addEventListener === 'function') {
         target.addEventListener('keydown', onKeyDown);
         target.addEventListener('keyup', onKeyUp);
+
+        // Connection events help maintain prompt preferred index updates
+        target.addEventListener('gamepadconnected', onGamepadConnected);
+        target.addEventListener('gamepaddisconnected', onGamepadDisconnected);
       }
     },
 
     /**
-     * Detaches listener from window or element.
+     * Detaches listeners from window or event target.
      */
     detach(target) {
       if (target && typeof target.removeEventListener === 'function') {
         target.removeEventListener('keydown', onKeyDown);
         target.removeEventListener('keyup', onKeyUp);
+        target.removeEventListener('gamepadconnected', onGamepadConnected);
+        target.removeEventListener('gamepaddisconnected', onGamepadDisconnected);
       }
       rawKeyStates.clear();
       simulatedActions.clear();
+      preferredGamepadIndex = null;
+    },
+
+    /**
+     * Returns machine-readable hardware diagnostics for inspectability.
+     */
+    getGamepadStatus() {
+      const pad = getLiveGamepad();
+      if (!pad) {
+        return {
+          detected: false,
+          source: activeGamepad ? 'injected' : 'navigator',
+          index: null,
+          id: null,
+          mapping: null,
+          connected: false,
+          axesCount: 0,
+          buttonsCount: 0,
+          axes: [],
+          buttons: [],
+          activeActions: []
+        };
+      }
+
+      const axes = [];
+      if (pad.axes && typeof pad.axes.length === 'number') {
+        for (let i = 0; i < pad.axes.length; i++) {
+          axes.push(Number(pad.axes[i]) || 0);
+        }
+      }
+
+      const buttons = [];
+      if (pad.buttons && typeof pad.buttons.length === 'number') {
+        for (let i = 0; i < pad.buttons.length; i++) {
+          const b = pad.buttons[i];
+          buttons.push(b && (typeof b === 'object' ? Boolean(b.pressed || b.value > 0.5) : Boolean(b > 0.5)));
+        }
+      }
+
+      const activeActions = [];
+      // Check buttons
+      for (const [btnIndex, action] of gamepadButtonMap.entries()) {
+        if (buttons[btnIndex] && declaredActions.has(action) && !activeActions.includes(action)) {
+          activeActions.push(action);
+        }
+      }
+      // Check axes
+      for (const binding of gamepadAxisMap.values()) {
+        const val = axes[binding.axis];
+        if (typeof val === 'number') {
+          const dz = binding.deadzone;
+          if (binding.negativeAction && val < -dz && declaredActions.has(binding.negativeAction) && !activeActions.includes(binding.negativeAction)) {
+            activeActions.push(binding.negativeAction);
+          }
+          if (binding.positiveAction && val > dz && declaredActions.has(binding.positiveAction) && !activeActions.includes(binding.positiveAction)) {
+            activeActions.push(binding.positiveAction);
+          }
+        }
+      }
+
+      return {
+        detected: true,
+        source: activeGamepad ? 'injected' : 'navigator',
+        index: typeof pad.index === 'number' ? pad.index : (preferredGamepadIndex !== null ? preferredGamepadIndex : 0),
+        id: pad.id || 'Standard Gamepad',
+        mapping: pad.mapping || 'non-standard',
+        connected: pad.connected !== false,
+        axesCount: axes.length,
+        buttonsCount: buttons.length,
+        axes,
+        buttons,
+        activeActions
+      };
     },
 
     /**
@@ -232,13 +387,13 @@ export function createInputSystem({
       }
 
       // 2. Gamepad bindings (polled hardware or injected object)
-      const pad = activeGamepad || (typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function' ? navigator.getGamepads()[0] : null);
+      const pad = getLiveGamepad();
       if (pad) {
         // Poll buttons
         if (pad.buttons && typeof pad.buttons.length === 'number') {
           for (const [btnIndex, action] of gamepadButtonMap.entries()) {
             const btn = pad.buttons[btnIndex];
-            const isPressed = btn && (typeof btn === 'object' ? Boolean(btn.pressed) : Boolean(btn));
+            const isPressed = btn && (typeof btn === 'object' ? Boolean(btn.pressed || btn.value > 0.5) : Boolean(btn > 0.5));
             if (isPressed && declaredActions.has(action)) {
               activeState[action] = true;
             }
@@ -288,6 +443,7 @@ export function createInputSystem({
       rawKeyStates.clear();
       simulatedActions.clear();
       activeGamepad = null;
+      preferredGamepadIndex = null;
     }
   };
 }

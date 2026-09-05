@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { createInputSystem } from '../src/runtime/input.js';
+import { createInputSystem, selectActiveGamepad } from '../src/runtime/input.js';
 
 test('input system: maps keyboard keys to semantic actions', () => {
   const input = createInputSystem();
@@ -197,4 +197,126 @@ test('input system: supports generic gamepad button and axis binding with deadzo
   pad.buttons[0].pressed = true;
   snap = input.captureSnapshot();
   assert.equal(snap.isActionActive('Attack'), false, 'unbound button does not trigger action');
+});
+
+test('gamepad discovery: selectActiveGamepad handles multi-slot arrays and disconnections', () => {
+  const pad1 = { index: 1, id: 'Gamepad 1', connected: true, axes: [0, 0], buttons: [] };
+  const pad2 = { index: 2, id: 'Gamepad 2', connected: true, axes: [0, 0], buttons: [] };
+
+  // 1. Slot 0 null, controller at slot 1 -> controller IS detected
+  const res1 = selectActiveGamepad([null, pad1, null, null]);
+  assert.equal(res1, pad1);
+  assert.equal(res1.index, 1);
+
+  // 2. Slots 0 and 1 null, controller at slot 2 -> detected
+  const res2 = selectActiveGamepad([null, null, pad2, null]);
+  assert.equal(res2, pad2);
+  assert.equal(res2.index, 2);
+
+  // 3. Retains preferred controller while still connected
+  const resRetain = selectActiveGamepad([null, pad1, pad2, null], 1);
+  assert.equal(resRetain, pad1);
+
+  // 4. Selected controller disconnects (null slot or connected: false) -> recovers to next valid controller
+  const resRecovNull = selectActiveGamepad([null, null, pad2, null], 1);
+  assert.equal(resRecovNull, pad2, 'recovers when preferred index becomes null');
+
+  const disconnectedPad1 = { ...pad1, connected: false };
+  const resRecovFlag = selectActiveGamepad([null, disconnectedPad1, pad2, null], 1);
+  assert.equal(resRecovFlag, pad2, 'recovers when preferred index has connected: false');
+
+  // 5. All slots null or disconnected -> returns null without throwing
+  assert.equal(selectActiveGamepad([null, null, null, null]), null);
+  assert.equal(selectActiveGamepad([disconnectedPad1, null]), null);
+  assert.equal(selectActiveGamepad([]), null);
+  assert.equal(selectActiveGamepad(null), null);
+  assert.equal(selectActiveGamepad(undefined), null);
+});
+
+test('gamepad discovery: live navigator.getGamepads multi-slot polling and diagnostic status', () => {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+
+  try {
+    const padSlot1 = {
+      index: 1,
+      id: 'Xbox Wireless Controller (STANDARD GAMEPAD)',
+      mapping: 'standard',
+      connected: true,
+      axes: [0, -0.85], // tilted forward
+      buttons: Array.from({ length: 16 }, (_, i) => ({ pressed: i === 0 })) // South pressed
+    };
+
+    let mockSlots = [null, padSlot1, null, null];
+    Object.defineProperty(globalThis, 'navigator', {
+      value: {
+        getGamepads: () => mockSlots
+      },
+      configurable: true,
+      writable: true
+    });
+
+    const actions = ['MoveForward', 'MoveBackward', 'MoveLeft', 'MoveRight', 'Attack', 'Reset'];
+    const input = createInputSystem({ actions });
+    input.bindGamepadAxis(1, 'MoveForward', 'MoveBackward', { deadzone: 0.25 });
+    input.bindGamepadButton(0, 'Attack');
+
+    // 1. Discovers pad at slot 1 without calling setGamepad()
+    const snap = input.captureSnapshot();
+    assert.equal(snap.isActionActive('MoveForward'), true, 'discovers stick deflection at slot 1');
+    assert.equal(snap.isActionActive('Attack'), true, 'discovers button press at slot 1');
+
+    // 2. getGamepadStatus() reports machine-readable diagnostics
+    const status = input.getGamepadStatus();
+    assert.equal(status.detected, true);
+    assert.equal(status.source, 'navigator');
+    assert.equal(status.index, 1);
+    assert.equal(status.id, 'Xbox Wireless Controller (STANDARD GAMEPAD)');
+    assert.equal(status.mapping, 'standard');
+    assert.equal(status.connected, true);
+    assert.ok(status.activeActions.includes('MoveForward'));
+    assert.ok(status.activeActions.includes('Attack'));
+
+    // 3. Explicit setGamepad() overrides navigator polling
+    const injectedPad = {
+      index: 0,
+      id: 'Injected Mock Pad',
+      mapping: 'standard',
+      connected: true,
+      axes: [0, 0.90], // backward
+      buttons: Array.from({ length: 16 }, () => ({ pressed: false }))
+    };
+    input.setGamepad(injectedPad);
+
+    const snapInjected = input.captureSnapshot();
+    assert.equal(snapInjected.isActionActive('MoveForward'), false);
+    assert.equal(snapInjected.isActionActive('MoveBackward'), true);
+    assert.equal(snapInjected.isActionActive('Attack'), false);
+
+    const injectedStatus = input.getGamepadStatus();
+    assert.equal(injectedStatus.source, 'injected');
+    assert.equal(injectedStatus.id, 'Injected Mock Pad');
+
+    // 4. Clearing injected pad restores navigator discovery
+    input.setGamepad(null);
+    const snapRestored = input.captureSnapshot();
+    assert.equal(snapRestored.isActionActive('MoveForward'), true);
+    assert.equal(snapRestored.isActionActive('Attack'), true);
+
+    // 5. Controller disconnects in navigator
+    mockSlots = [null, null, null, null];
+    const snapDisconnected = input.captureSnapshot();
+    assert.equal(snapDisconnected.isActionActive('MoveForward'), false);
+    assert.equal(snapDisconnected.isActionActive('Attack'), false);
+
+    const disconnStatus = input.getGamepadStatus();
+    assert.equal(disconnStatus.detected, false);
+    assert.equal(disconnStatus.connected, false);
+    assert.equal(disconnStatus.activeActions.length, 0);
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(globalThis, 'navigator', originalDescriptor);
+    } else {
+      delete globalThis.navigator;
+    }
+  }
 });

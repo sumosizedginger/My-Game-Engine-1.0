@@ -54,6 +54,9 @@ export function createB2Viewer({ container, isControlled = false }) {
         game.input.setGamepad(gamepad);
       }
     },
+    getGamepadStatus: () => {
+      return typeof game.input?.getGamepadStatus === 'function' ? game.input.getGamepadStatus() : null;
+    },
     step: (dtMs = 16.666) => {
       const dt = dtMs * 0.001;
       game.update(dt);
@@ -131,6 +134,27 @@ export function createB2Viewer({ container, isControlled = false }) {
     const enemyStateEl = document.getElementById('b2-stat-enemy-state');
     if (enemyStateEl) {
       enemyStateEl.textContent = `AI: ${snap.enemy.aiState}`;
+    }
+
+    // Live controller diagnostic (unobtrusive live-mode inspectability)
+    const diagStatus = document.getElementById('b2-diag-status');
+    const diagActions = document.getElementById('b2-diag-actions');
+    if (diagStatus) {
+      const gp = typeof game.input?.getGamepadStatus === 'function' ? game.input.getGamepadStatus() : null;
+      if (gp && gp.detected) {
+        const idShort = gp.id.length > 28 ? gp.id.slice(0, 28) + '...' : gp.id;
+        diagStatus.textContent = `[#${gp.index}] ${idShort} (${gp.mapping})`;
+        diagStatus.style.color = '#4ade80';
+        if (diagActions) {
+          diagActions.textContent = gp.activeActions.length > 0 ? `Actions: ${gp.activeActions.join(', ')}` : 'Idle';
+        }
+      } else {
+        diagStatus.textContent = 'None detected (press any button to activate)';
+        diagStatus.style.color = '#94a3b8';
+        if (diagActions) {
+          diagActions.textContent = '';
+        }
+      }
     }
   }
 

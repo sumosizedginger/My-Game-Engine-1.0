@@ -107,10 +107,21 @@ if (isB2Mode) {
           <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">W</kbd>
           <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">A</kbd>
           <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">S</kbd>
-          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">D</kbd> or Arrows to Move •
-          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">Space</kbd> / <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">J</kbd> to Strike •
-          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">R</kbd> to Reset
+          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">D</kbd> or Arrows / Controller Left Stick / D-Pad to Move •
+          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">Space</kbd> / <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">J</kbd> / Controller South (A) to Strike •
+          <kbd style="background: #1e293b; padding: 2px 6px; border-radius: 4px; color: #f8fafc;">R</kbd> / Controller North (Y) to Reset
         </div>
+
+        ${!isControlled ? `
+        <!-- Live Controller Diagnostic -->
+        <div id="b2-controller-diagnostic" style="margin-top: 6px; padding: 6px 14px; background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; font-size: 11px; color: #94a3b8; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <span style="color: #64748b; font-weight: 600;">Controller:</span>
+            <span id="b2-diag-status" style="color: #cbd5e1; font-weight: 600; margin-left: 6px;">Searching (press any button to activate)...</span>
+          </div>
+          <div id="b2-diag-actions" style="color: #38bdf8; font-weight: 600; font-family: monospace;"></div>
+        </div>
+        ` : ''}
 
         <div id="proof-b2-fixture-tag" style="margin-top: 6px; font-size: 11px; color: #475569;">
           ${isControlled ? 'PROOF_B2_CONTROLLED_FIXTURE' : `Active Combat Loop (${ENGINE_VERSION})`}
