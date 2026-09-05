@@ -167,9 +167,11 @@ export function createLocomotionEvaluator(character, motionOptions = 'natural') 
       hipX: landmarks['hip.R'].x
     });
 
-    // Solve Left Leg IK using exact realized hip world position
+    // Solve Left Leg IK in character root space (independent of mesh world position)
     if (bonesByName.thigh_l && bonesByName.shin_l && bonesByName.foot_l) {
-      bonesByName.thigh_l.getWorldPosition(_hipWorldPosL);
+      _hipWorldPosL.copy(bonesByName.thigh_l.position)
+        .applyQuaternion(bonesByName.pelvis.quaternion)
+        .add(bonesByName.pelvis.position);
 
       const ikL = solveTwoBoneIK({
         rootPos: _hipWorldPosL,
@@ -180,33 +182,29 @@ export function createLocomotionEvaluator(character, motionOptions = 'natural') 
         invertBend: false
       });
 
-      // Thigh world orientation -> local quaternion relative to parent pelvis
+      // Thigh character orientation -> local quaternion relative to parent pelvis
       _targetThighDir.set(ikL.upperDir.x, ikL.upperDir.y, ikL.upperDir.z).normalize();
       _qThighWorld.setFromUnitVectors(restThighDirL, _targetThighDir);
-      bonesByName.pelvis.getWorldQuaternion(_qPelvisWorld);
-      _qThighLocal.copy(_qPelvisWorld).invert().multiply(_qThighWorld);
+      _qThighLocal.copy(bonesByName.pelvis.quaternion).invert().multiply(_qThighWorld);
       bonesByName.thigh_l.quaternion.copy(_qThighLocal);
-      bonesByName.thigh_l.updateWorldMatrix(true, false);
 
-      // Shin world orientation -> local quaternion relative to parent thigh
+      // Shin character orientation -> local quaternion relative to parent thigh
       _targetShinDir.set(ikL.lowerDir.x, ikL.lowerDir.y, ikL.lowerDir.z).normalize();
       _qShinWorld.setFromUnitVectors(restShinDirL, _targetShinDir);
-      bonesByName.thigh_l.getWorldQuaternion(_qThighWorld);
       _qShinLocal.copy(_qThighWorld).invert().multiply(_qShinWorld);
       bonesByName.shin_l.quaternion.copy(_qShinLocal);
-      bonesByName.shin_l.updateWorldMatrix(true, false);
 
       // Foot pitch orientation -> local quaternion relative to parent shin
       _qFootWorld.setFromAxisAngle(_xAxis, footPlacementL.pitchAngle);
-      bonesByName.shin_l.getWorldQuaternion(_qShinWorld);
       _qFootLocal.copy(_qShinWorld).invert().multiply(_qFootWorld);
       bonesByName.foot_l.quaternion.copy(_qFootLocal);
-      bonesByName.foot_l.updateWorldMatrix(true, false);
     }
 
-    // Solve Right Leg IK using exact realized hip world position
+    // Solve Right Leg IK in character root space (independent of mesh world position)
     if (bonesByName.thigh_r && bonesByName.shin_r && bonesByName.foot_r) {
-      bonesByName.thigh_r.getWorldPosition(_hipWorldPosR);
+      _hipWorldPosR.copy(bonesByName.thigh_r.position)
+        .applyQuaternion(bonesByName.pelvis.quaternion)
+        .add(bonesByName.pelvis.position);
 
       const ikR = solveTwoBoneIK({
         rootPos: _hipWorldPosR,
@@ -219,23 +217,17 @@ export function createLocomotionEvaluator(character, motionOptions = 'natural') 
 
       _targetThighDir.set(ikR.upperDir.x, ikR.upperDir.y, ikR.upperDir.z).normalize();
       _qThighWorld.setFromUnitVectors(restThighDirR, _targetThighDir);
-      bonesByName.pelvis.getWorldQuaternion(_qPelvisWorld);
-      _qThighLocal.copy(_qPelvisWorld).invert().multiply(_qThighWorld);
+      _qThighLocal.copy(bonesByName.pelvis.quaternion).invert().multiply(_qThighWorld);
       bonesByName.thigh_r.quaternion.copy(_qThighLocal);
-      bonesByName.thigh_r.updateWorldMatrix(true, false);
 
       _targetShinDir.set(ikR.lowerDir.x, ikR.lowerDir.y, ikR.lowerDir.z).normalize();
       _qShinWorld.setFromUnitVectors(restShinDirR, _targetShinDir);
-      bonesByName.thigh_r.getWorldQuaternion(_qThighWorld);
       _qShinLocal.copy(_qThighWorld).invert().multiply(_qShinWorld);
       bonesByName.shin_r.quaternion.copy(_qShinLocal);
-      bonesByName.shin_r.updateWorldMatrix(true, false);
 
       _qFootWorld.setFromAxisAngle(_xAxis, footPlacementR.pitchAngle);
-      bonesByName.shin_r.getWorldQuaternion(_qShinWorld);
       _qFootLocal.copy(_qShinWorld).invert().multiply(_qFootWorld);
       bonesByName.foot_r.quaternion.copy(_qFootLocal);
-      bonesByName.foot_r.updateWorldMatrix(true, false);
     }
 
     // -------------------------------------------------------------
@@ -304,12 +296,18 @@ export function createLocomotionEvaluator(character, motionOptions = 'natural') 
       character.rootBone.updateWorldMatrix(true, true);
     }
 
-    // Measure exact realized foot bone world positions
+    // Measure exact realized foot bone positions in character space
     if (bonesByName.foot_l) {
       bonesByName.foot_l.getWorldPosition(_realizedFootPosL);
+      if (character.mesh) {
+        character.mesh.worldToLocal(_realizedFootPosL);
+      }
     }
     if (bonesByName.foot_r) {
       bonesByName.foot_r.getWorldPosition(_realizedFootPosR);
+      if (character.mesh) {
+        character.mesh.worldToLocal(_realizedFootPosR);
+      }
     }
 
     // Movement intent for engine transform authority
