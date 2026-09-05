@@ -1,10 +1,10 @@
 /**
- * My Game Engine 1.0 — A0 Evaluation Harness (Extended for Proof A)
+ * My Game Engine 1.0 — Evaluation Harness (Extended for Proof A & Proof B1)
  * Canonical repository: sumosizedginger/My-Game-Engine-1.0
  *
  * Orchestrates automated browser validation, machine-readable reporting,
  * deterministic capture, and diagnostic/telemetry collection.
- * Evaluates both Phase 0 Boot Proof and Proof A Pong Game.
+ * Evaluates Phase 0 Boot Proof, Proof A Pong Game, and Proof B1 Motion Truth.
  */
 
 import { spawn } from 'node:child_process';
@@ -110,7 +110,7 @@ function saveCapture(outputDir, captureName, revisionCommit, viewport, buffer) {
  * Runs evaluation on target(s).
  *
  * @param {object} [options={}]
- * @param {string} [options.url] - Specific evaluation URL. If omitted, evaluates full suite (Phase 0 + Proof A).
+ * @param {string} [options.url] - Specific evaluation URL. If omitted, evaluates full suite (Phase 0 + Proof A + Proof B1).
  * @param {string} [options.captureName] - Specific capture name.
  * @param {object} [options.viewport={ width: 1280, height: 720 }] - Viewport size.
  * @param {string} [options.outputDir='artifacts'] - Artifacts directory.
@@ -140,13 +140,18 @@ export async function runEvaluation(options = {}) {
     });
 
     if (browserResult.screenshotBuffer) {
-      const capName = options.captureName || (phase0Url.includes('game=pong') ? 'proof_a_pong_fixture' : 'phase0_boot_fixture');
+      let capName = options.captureName;
+      if (!capName) {
+        if (phase0Url.includes('proof=b1')) capName = 'proof_b1_motion_fixture';
+        else if (phase0Url.includes('game=pong')) capName = 'proof_a_pong_fixture';
+        else capName = 'phase0_boot_fixture';
+      }
       captures.push(saveCapture(outputDir, capName, revision.commit, viewport, browserResult.screenshotBuffer));
     }
 
     // Baseline checks
     const checks = {
-      boot: browserResult.httpStatus === 200 && (Boolean(browserResult.bootProof) || Boolean(browserResult.pongProof)),
+      boot: browserResult.httpStatus === 200 && (Boolean(browserResult.bootProof) || Boolean(browserResult.pongProof) || Boolean(browserResult.b1Proof)),
       runtimeMode: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.runtimeBoot) : true,
       fullEngineSeam: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.fullEngineSeam) : true,
       purity: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.purityCheck) : true,
@@ -165,8 +170,9 @@ export async function runEvaluation(options = {}) {
       { severity: 'INFO', code: 'BOOT_COMPLETE', subsystem: 'runtime' }
     ];
 
-    // 4. If running standard full suite, also evaluate Proof A Pong
+    // 4. If running standard full suite, evaluate Proof A Pong AND Proof B1 Motion
     if (!isCustomSingleTarget) {
+      // 4a. Proof A Pong
       const pongUrl = 'http://localhost:5173/?game=pong&controlled=1';
       const pongResult = await runBrowserEvaluation({
         url: pongUrl,
@@ -192,6 +198,43 @@ export async function runEvaluation(options = {}) {
 
       if (pongResult.pongProof?.diagnosticsRecords) {
         rawDiagnostics.push(...pongResult.pongProof.diagnosticsRecords);
+      }
+
+      // 4b. Proof B1 Motion Truth
+      const b1Url = 'http://localhost:5173/?proof=b1&controlled=1';
+      const b1Result = await runBrowserEvaluation({
+        url: b1Url,
+        viewport,
+        captureScreenshot: true
+      });
+
+      if (b1Result.screenshotBuffer) {
+        captures.push(saveCapture(outputDir, 'proof_b1_motion_fixture', revision.commit, viewport, b1Result.screenshotBuffer));
+      }
+
+      checks.b1Boot = b1Result.httpStatus === 200 && Boolean(b1Result.b1Proof);
+      checks.b1CharacterGeneration = Boolean(b1Result.b1Proof?.checks?.hasGeometry && b1Result.b1Proof?.checks?.hasSkeleton && b1Result.b1Proof?.checks?.skinningNormalized);
+      checks.b1MotionExecution = Boolean(b1Result.b1Proof?.checks?.phaseAdvanced && b1Result.b1Proof?.checks?.speedValid && b1Result.b1Proof?.checks?.pelvisDynamic);
+      checks.b1GroundingCheck = Boolean(b1Result.b1Proof?.checks?.groundingValid);
+
+      if (b1Result.consoleErrors.length > 0) checks.noConsoleErrors = false;
+      if (b1Result.pageErrors.length > 0) checks.noPageErrors = false;
+      if (b1Result.failedRequests.length > 0) checks.noFailedRequests = false;
+
+      allConsoleErrors.push(...b1Result.consoleErrors);
+      allPageErrors.push(...b1Result.pageErrors);
+      allFailedRequests.push(...b1Result.failedRequests);
+
+      if (b1Result.b1Proof?.diagnosticsRecords) {
+        rawDiagnostics.push(...b1Result.b1Proof.diagnosticsRecords);
+      }
+    } else if (phase0Url.includes('proof=b1') && browserResult.b1Proof) {
+      checks.b1Boot = true;
+      checks.b1CharacterGeneration = Boolean(browserResult.b1Proof.checks?.hasGeometry && browserResult.b1Proof.checks?.hasSkeleton && browserResult.b1Proof.checks?.skinningNormalized);
+      checks.b1MotionExecution = Boolean(browserResult.b1Proof.checks?.phaseAdvanced && browserResult.b1Proof.checks?.speedValid && browserResult.b1Proof.checks?.pelvisDynamic);
+      checks.b1GroundingCheck = Boolean(browserResult.b1Proof.checks?.groundingValid);
+      if (browserResult.b1Proof.diagnosticsRecords) {
+        rawDiagnostics.push(...browserResult.b1Proof.diagnosticsRecords);
       }
     } else if (phase0Url.includes('game=pong') && browserResult.pongProof) {
       checks.pongBoot = true;
@@ -227,7 +270,7 @@ export async function runEvaluation(options = {}) {
       telemetry,
       captures,
       browserDetails: {
-        url: isCustomSingleTarget ? phase0Url : 'http://localhost:5173/ (Full Suite: Phase 0 + Proof A)',
+        url: isCustomSingleTarget ? phase0Url : 'http://localhost:5173/ (Full Suite: Phase 0 + Proof A + Proof B1)',
         httpStatus: browserResult.httpStatus,
         dom: browserResult.domDetails,
         consoleErrors: allConsoleErrors,
@@ -257,6 +300,17 @@ export async function runProofAEvaluation(options = {}) {
   return runEvaluation({
     url: 'http://localhost:5173/?game=pong&controlled=1',
     captureName: 'proof_a_pong_fixture',
+    ...options
+  });
+}
+
+/**
+ * Convenience helper to evaluate Proof B1 Motion Truth specifically.
+ */
+export async function runProofB1Evaluation(options = {}) {
+  return runEvaluation({
+    url: 'http://localhost:5173/?proof=b1&controlled=1',
+    captureName: 'proof_b1_motion_fixture',
     ...options
   });
 }

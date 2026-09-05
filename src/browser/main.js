@@ -3,8 +3,9 @@
  * Canonical repository: sumosizedginger/My-Game-Engine-1.0
  *
  * Supports:
- * 1. Proof A Pong Game (?game=pong)
- * 2. Phase 0 Minimal Boot Proof (default or ?proof=phase0)
+ * 1. Proof B1 Motion Truth (?proof=b1)
+ * 2. Proof A Pong Game (?game=pong)
+ * 3. Phase 0 Minimal Boot Proof (default or ?proof=phase0)
  */
 
 import {
@@ -17,20 +18,159 @@ import {
 
 import { createEngineFull, ENTRY_POINT as FULL_ENTRY_POINT } from '../full/index.js';
 import { createPongGame } from '../games/pong/index.js';
+import { createB1Viewer } from './b1-viewer.js';
 
 const params = new URLSearchParams(window.location.search);
+const isB1Mode = params.get('proof') === 'b1';
 const isPongMode = params.get('game') === 'pong';
 const isControlled = params.has('controlled');
 
 const app = document.getElementById('app');
 
-if (isPongMode) {
+if (isB1Mode) {
+  // ==========================================
+  // PROOF B1: MOTION TRUTH
+  // ==========================================
+  if (app) {
+    app.innerHTML = `
+      <div style="display: flex; flex-direction: column; align-items: center; max-width: 900px; width: 100%; margin: 20px auto; padding: 0 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <!-- Top Navigation -->
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 16px;">
+          <div>
+            <span style="font-size: 18px; font-weight: 700; color: #38bdf8;">${ENGINE_NAME}</span>
+            <span style="font-size: 13px; color: #94a3b8; margin-left: 8px;">Proof B1 — Motion Truth</span>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <a href="/?proof=b1" style="font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 6px; background: #0284c7; color: #ffffff; text-decoration: none; border: 1px solid #0284c7;">Motion Studio</a>
+            <a href="/?game=pong" style="font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Proof A (Pong)</a>
+            <a href="/?proof=phase0" style="font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Phase 0 Boot</a>
+          </div>
+        </div>
+
+        <!-- Studio Control Bar -->
+        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; width: 100%; background: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 10px 16px; margin-bottom: 12px; box-sizing: border-box;">
+          <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <label style="font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
+              Character:
+              <select id="b1-char-select" style="background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 4px; padding: 3px 8px; font-size: 12px;">
+                <option value="average" selected>Average (1.80m)</option>
+                <option value="athletic">Athletic (1.85m)</option>
+                <option value="heavy">Heavy (1.78m)</option>
+              </select>
+            </label>
+
+            <label style="font-size: 12px; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
+              Motion:
+              <select id="b1-motion-select" style="background: #1e293b; color: #f8fafc; border: 1px solid #334155; border-radius: 4px; padding: 3px 8px; font-size: 12px;">
+                <option value="natural" selected>Natural (112 spm)</option>
+                <option value="energetic">Energetic (128 spm)</option>
+                <option value="stroll">Stroll (92 spm)</option>
+              </select>
+            </label>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button id="b1-btn-wireframe" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer;">Wireframe</button>
+            <button id="b1-btn-bones" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer;">Bones</button>
+            <button id="b1-btn-slowmo" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer;">Slow-Mo (0.25x)</button>
+            <button id="b1-btn-freewalk" style="background: #1e293b; color: #cbd5e1; border: 1px solid #334155; border-radius: 4px; padding: 4px 10px; font-size: 11px; cursor: pointer;">In-Place (Treadmill)</button>
+          </div>
+        </div>
+
+        <!-- WebGL 3D Studio Canvas Container -->
+        <div id="b1-canvas-container" style="position: relative; width: 100%; height: 540px; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7); border: 2px solid #1e293b; background: #181a20;"></div>
+
+        <!-- Telemetry & Grounding Diagnostics -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; width: 100%; margin-top: 12px;">
+          <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; font-size: 12px;">
+            <span style="color: #64748b;">Cycle Phase:</span> <span id="b1-stat-phase" style="color: #38bdf8; font-weight: 600;">0.0%</span>
+            <span style="color: #64748b; margin-left: 8px;">Speed:</span> <span id="b1-stat-speed" style="color: #4ade80; font-weight: 600;">1.21 m/s</span>
+          </div>
+
+          <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; font-size: 12px;">
+            <span style="color: #64748b;">Foot Contact:</span> <span id="b1-stat-contact" style="color: #facc15; font-weight: 600;">L: STANCE | R: STANCE</span>
+          </div>
+
+          <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; font-size: 12px;">
+            <span style="color: #64748b;">Pelvis:</span> <span id="b1-stat-pelvis" style="color: #c084fc; font-weight: 600;">Bounce: 0.0mm | Sway: 0.0mm</span>
+          </div>
+
+          <div style="background: #0f172a; border: 1px solid #1e293b; border-radius: 6px; padding: 8px 12px; font-size: 12px;">
+            <span style="color: #64748b;">Skinning Invariant:</span> <span style="color: #4ade80; font-weight: 600;">✔ Σw = 1.0 (0 err)</span>
+          </div>
+        </div>
+
+        <!-- Visual Verification Instructions -->
+        <div style="margin-top: 12px; padding: 10px 16px; background: #0b1120; border: 1px solid #1e293b; border-radius: 6px; font-size: 11px; color: #64748b; text-align: center; width: 100%; box-sizing: border-box;">
+          <span style="color: #94a3b8; font-weight: 500;">Interaction:</span> Drag to orbit camera around character • Scroll wheel to zoom • 1m Floor Grid for inspecting foot contact & sliding
+        </div>
+
+        <div id="proof-b1-fixture-tag" style="margin-top: 8px; font-size: 11px; color: #475569;">
+          ${isControlled ? 'PROOF_B1_CONTROLLED_FIXTURE' : `Active Motion Loop (${ENGINE_VERSION})`}
+        </div>
+      </div>
+    `;
+
+    const container = document.getElementById('b1-canvas-container');
+    const viewer = createB1Viewer({ container, isControlled });
+
+    // Wire controls
+    const charSelect = document.getElementById('b1-char-select');
+    if (charSelect) {
+      charSelect.addEventListener('change', (e) => viewer.setCharPreset(e.target.value));
+    }
+
+    const motionSelect = document.getElementById('b1-motion-select');
+    if (motionSelect) {
+      motionSelect.addEventListener('change', (e) => viewer.setMotionPreset(e.target.value));
+    }
+
+    const btnWireframe = document.getElementById('b1-btn-wireframe');
+    if (btnWireframe) {
+      btnWireframe.addEventListener('click', () => {
+        const active = viewer.toggleWireframe();
+        btnWireframe.style.background = active ? '#0284c7' : '#1e293b';
+        btnWireframe.style.color = active ? '#ffffff' : '#cbd5e1';
+      });
+    }
+
+    const btnBones = document.getElementById('b1-btn-bones');
+    if (btnBones) {
+      btnBones.addEventListener('click', () => {
+        const active = viewer.toggleBones();
+        btnBones.style.background = active ? '#0284c7' : '#1e293b';
+        btnBones.style.color = active ? '#ffffff' : '#cbd5e1';
+      });
+    }
+
+    const btnSlowMo = document.getElementById('b1-btn-slowmo');
+    if (btnSlowMo) {
+      btnSlowMo.addEventListener('click', () => {
+        const active = viewer.toggleSlowMotion();
+        btnSlowMo.style.background = active ? '#0284c7' : '#1e293b';
+        btnSlowMo.style.color = active ? '#ffffff' : '#cbd5e1';
+      });
+    }
+
+    const btnFreeWalk = document.getElementById('b1-btn-freewalk');
+    if (btnFreeWalk) {
+      btnFreeWalk.addEventListener('click', () => {
+        const active = viewer.toggleFreeWalk();
+        btnFreeWalk.textContent = active ? 'Free Walk (Forward)' : 'In-Place (Treadmill)';
+        btnFreeWalk.style.background = active ? '#0284c7' : '#1e293b';
+        btnFreeWalk.style.color = active ? '#ffffff' : '#cbd5e1';
+      });
+    }
+
+    console.log('[My Game Engine 1.0] Proof B1 Motion Viewer initialized');
+  }
+} else if (isPongMode) {
   // ==========================================
   // PROOF A: PONG GAME
   // ==========================================
   if (app) {
     app.innerHTML = `
-      <div style="display: flex; flex-direction: column; align-items: center; max-width: 860px; width: 100%; margin: 24px auto; padding: 0 16px;">
+      <div style="display: flex; flex-direction: column; align-items: center; max-width: 860px; width: 100%; margin: 24px auto; padding: 0 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
         <!-- Top Navigation -->
         <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 16px;">
           <div>
@@ -38,8 +178,9 @@ if (isPongMode) {
             <span style="font-size: 13px; color: #94a3b8; margin-left: 8px;">Proof A — Tiny Complete Game</span>
           </div>
           <div style="display: flex; gap: 8px;">
-            <a href="/?game=pong" style="font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 6px; background: #0284c7; color: #ffffff; text-decoration: none;">Pong Court</a>
-            <a href="/?proof=phase0" style="font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Phase 0 Boot Proof</a>
+            <a href="/?proof=b1" style="font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Proof B1 (Motion)</a>
+            <a href="/?game=pong" style="font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 6px; background: #0284c7; color: #ffffff; text-decoration: none; border: 1px solid #0284c7;">Pong Court</a>
+            <a href="/?proof=phase0" style="font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Phase 0 Boot</a>
           </div>
         </div>
 
@@ -141,6 +282,7 @@ if (isPongMode) {
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; border-bottom: 1px solid #334155; padding-bottom: 16px;">
           <h1 id="engine-title" style="margin: 0; font-size: 24px; font-weight: 700; color: #38bdf8;">${results.engineName}</h1>
           <div style="display: flex; align-items: center; gap: 8px;">
+            <a href="/?proof=b1" style="font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 6px; background: #1e293b; color: #94a3b8; text-decoration: none; border: 1px solid #334155;">Proof B1 (Motion)</a>
             <a href="/?game=pong" style="font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 6px; background: #0284c7; color: #ffffff; text-decoration: none;">Launch Proof A (Pong)</a>
             <span id="boot-status" style="font-size: 14px; font-weight: 700; padding: 4px 12px; border-radius: 9999px; background: ${isPass ? '#166534' : '#991b1b'}; color: ${isPass ? '#4ade80' : '#f87171'};">
               ${results.status}

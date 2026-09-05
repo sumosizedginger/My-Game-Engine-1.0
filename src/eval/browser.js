@@ -3,7 +3,7 @@
  * Canonical repository: sumosizedginger/My-Game-Engine-1.0
  *
  * Drives headless browser validation using puppeteer-core and local Chrome/Edge.
- * Supports both Phase 0 Boot Proof and Proof A Pong gameplay evaluation.
+ * Supports Phase 0 Boot Proof, Proof A Pong gameplay, and Proof B1 Motion Truth.
  */
 
 import fs from 'node:fs';
@@ -97,12 +97,14 @@ export function runBrowserEvaluation({
       const response = await page.goto(url, { waitUntil: 'load', timeout });
       const httpStatus = response ? response.status() : 0;
 
-      // Wait for engine module initialization
+      // Wait for engine module initialization based on target URL
       try {
-        if (url.includes('game=pong')) {
+        if (url.includes('proof=b1')) {
+          await page.waitForFunction(() => Boolean(window.__PROOF_B1_MOTION__), { timeout: 6000 });
+        } else if (url.includes('game=pong')) {
           await page.waitForFunction(() => Boolean(window.__PROOF_A_PONG__), { timeout: 6000 });
         } else {
-          await page.waitForFunction(() => Boolean(window.__PHASE_0_BOOT_PROOF__), { timeout: 6000 });
+          await page.waitForFunction(() => Boolean(window.__PHASE_0_BOOT_PROOF__ || window.__PROOF_RESULTS__), { timeout: 6000 });
         }
       } catch (waitErr) {
         console.warn(`[BrowserEval] Timeout waiting for boot window object on ${url}:`, waitErr.message);
@@ -110,7 +112,7 @@ export function runBrowserEvaluation({
 
       // Extract boot proof object if on Phase 0 boot page
       const bootProof = await page.evaluate(() => {
-        return window.__PHASE_0_BOOT_PROOF__ || null;
+        return window.__PHASE_0_BOOT_PROOF__ || window.__PROOF_RESULTS__ || null;
       });
 
       // Inspect DOM elements
@@ -122,10 +124,11 @@ export function runBrowserEvaluation({
         const matchStatusBadge = document.getElementById('match-status-badge')?.textContent?.trim() || '';
         const p1Score = document.getElementById('p1-score')?.textContent?.trim() || '';
         const p2Score = document.getElementById('p2-score')?.textContent?.trim() || '';
-        return { engineTitle, bootStatus, repoId, toolchainLabel, matchStatusBadge, p1Score, p2Score };
+        const b1Phase = document.getElementById('b1-stat-phase')?.textContent?.trim() || '';
+        return { engineTitle, bootStatus, repoId, toolchainLabel, matchStatusBadge, p1Score, p2Score, b1Phase };
       });
 
-      // Capture deterministic initial baseline screenshot BEFORE executing interactive simulation
+      // Capture deterministic baseline screenshot
       let screenshotBuffer = null;
       if (captureScreenshot) {
         screenshotBuffer = await page.screenshot({ type: 'png' });
@@ -195,11 +198,88 @@ export function runBrowserEvaluation({
         });
       }
 
+      // If evaluating Proof B1 Motion, run in-browser character and motion evaluation
+      let b1Proof = null;
+      if (url.includes('proof=b1')) {
+        b1Proof = await page.evaluate(() => {
+          try {
+            if (!window.__PROOF_B1_MOTION__) {
+              return { success: false, error: 'window.__PROOF_B1_MOTION__ not found' };
+            }
+            const b1 = window.__PROOF_B1_MOTION__;
+            const initial = b1.getStats();
+
+            // 1. Initial character generation checks
+            const hasGeometry = b1.vertexCount > 300 && b1.triangleCount > 500;
+            const hasSkeleton = b1.boneCount === 22;
+            const skinningNormalized = b1.skinningNormalized && b1.maxNormalizationError < 1e-4;
+
+            // 2. Controlled motion step (step 250ms = 1/4 second)
+            const stepRes = b1.step(250);
+            const afterStep = b1.getStats();
+            const phaseAdvanced = afterStep.phase > 0;
+            const speedValid = afterStep.speed > 0.5 && afterStep.speed < 3.0;
+
+            // 3. Grounding height check
+            const leftH = stepRes.contactStates.leftHeight;
+            const rightH = stepRes.contactStates.rightHeight;
+            const groundingValid = leftH >= 0.05 && rightH >= 0.05;
+
+            // 4. Dynamic Pelvis check (pelvis moved dynamically)
+            const pelvisDynamic = Math.abs(stepRes.pelvisState.bounceY) > 0 || Math.abs(stepRes.pelvisState.swayX) > 0;
+
+            const allPassed = Boolean(
+              hasGeometry &&
+              hasSkeleton &&
+              skinningNormalized &&
+              phaseAdvanced &&
+              speedValid &&
+              groundingValid &&
+              pelvisDynamic
+            );
+
+            return {
+              success: allPassed,
+              checks: {
+                hasGeometry,
+                hasSkeleton,
+                skinningNormalized,
+                phaseAdvanced,
+                speedValid,
+                groundingValid,
+                pelvisDynamic,
+                vertexCount: b1.vertexCount,
+                triangleCount: b1.triangleCount,
+                boneCount: b1.boneCount,
+                initialPhase: initial.phase,
+                afterPhase: afterStep.phase,
+                speed: afterStep.speed,
+                leftHeight: leftH,
+                rightHeight: rightH,
+                maxNormError: b1.maxNormalizationError
+              },
+              diagnosticsRecords: [
+                { severity: 'INFO', code: 'B1_CHAR_OK', subsystem: 'character', message: `Vertices: ${b1.vertexCount}, Bones: ${b1.boneCount}` },
+                { severity: 'INFO', code: 'B1_MOTION_OK', subsystem: 'motion', message: `Speed: ${afterStep.speed.toFixed(2)}m/s, Phase: ${(afterStep.phase * 100).toFixed(1)}%` },
+                { severity: 'INFO', code: 'B1_GROUNDING_OK', subsystem: 'motion', message: `L: ${leftH.toFixed(3)}m, R: ${rightH.toFixed(3)}m` }
+              ]
+            };
+          } catch (evalErr) {
+            return {
+              success: false,
+              evalError: evalErr.message,
+              stack: evalErr.stack
+            };
+          }
+        });
+      }
+
       return {
         url,
         httpStatus,
         bootProof,
         pongProof,
+        b1Proof,
         domDetails,
         consoleErrors,
         consoleWarnings,

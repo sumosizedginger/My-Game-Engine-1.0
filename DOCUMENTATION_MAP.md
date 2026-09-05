@@ -198,10 +198,10 @@ Create them only when implementation reaches the relevant proof.
 Potential durable subsystem specifications:
 
 ```text
-GAMEPLAY_FOUNDATION.md
+GAMEPLAY_FOUNDATION.md (Earned by Proof A)
 GEOMETRY_FORGE.md
-CHARACTER_FORGE.md
-MOTION_FORGE.md
+CHARACTER_FORGE.md (Earned by Proof B1)
+MOTION_FORGE.md (Earned by Proof B1)
 MATERIAL_FORGE.md
 WORLD_FORGE.md
 AUDIO_AND_FX.md
@@ -394,6 +394,9 @@ Relevant concerns:
 - transform-authority compliance;
 - deformation quality;
 - deterministic visual evaluation.
+
+Operational note:
+See `TESTING_AND_VALIDATION.md` §22.1 for evaluation harness operations covering Proof B1 targets (`?proof=b1&controlled=1`), checks (`b1Boot`, `b1CharacterGeneration`, `b1MotionExecution`, `b1GroundingCheck`), and capture fixtures (`artifacts/captures/proof_b1_motion_fixture.png`).
 
 Do not hide failed motion behind unrelated effects or environments.
 

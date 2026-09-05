@@ -27,5 +27,8 @@
   "devDependencies": {
     "puppeteer-core": "^25.10.0",
     "vite": "8.2.2"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
   }
 }
