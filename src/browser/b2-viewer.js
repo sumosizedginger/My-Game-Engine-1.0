@@ -50,7 +50,7 @@ export function createB2Viewer({ container, isControlled = false }) {
       game.input.simulateAction(action, active);
     },
     setGamepad: (gamepad) => {
-      if (typeof game.input.setGamepad === 'function') {
+      if (typeof game.input?.setGamepad === 'function') {
         game.input.setGamepad(gamepad);
       }
     },
@@ -158,12 +158,19 @@ export function createB2Viewer({ container, isControlled = false }) {
     }
   }
 
-  // 6. Window Resize Handler
+  // 6. Window Resize Handler & Observer
   function onResize() {
     renderer.resize();
   }
+  let resizeObserver = null;
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', onResize);
+    if (!isControlled && typeof ResizeObserver !== 'undefined' && container) {
+      resizeObserver = new ResizeObserver(() => {
+        renderer.resize();
+      });
+      resizeObserver.observe(container);
+    }
   }
 
   // 7. Initial render (ensures scene is drawn immediately)
@@ -198,6 +205,9 @@ export function createB2Viewer({ container, isControlled = false }) {
     }
     if (typeof window !== 'undefined') {
       window.removeEventListener('resize', onResize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
       if (game.input?.detach) {
         game.input.detach(window);
       }

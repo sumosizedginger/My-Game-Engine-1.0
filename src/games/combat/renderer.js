@@ -44,6 +44,9 @@ export function createCombatRenderer({ container, game, isControlled = false }) 
   const renderer = new WebGLRenderer({ antialias: true, alpha: false });
   renderer.setSize(width, height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  if (!isControlled) {
+    renderer.domElement.style.display = 'block';
+  }
   container.appendChild(renderer.domElement);
 
   // 4. Studio Lighting
@@ -161,6 +164,7 @@ export function createCombatRenderer({ container, game, isControlled = false }) 
     const h = container.clientHeight || 540;
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(w, h);
   }
 

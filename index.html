@@ -18,6 +18,25 @@
         min-height: 100vh;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       }
+
+      /* Scoped full-screen game mode for Live B2 */
+      html.b2-live-mode,
+      body.b2-live-mode {
+        margin: 0;
+        padding: 0;
+        width: 100vw;
+        height: 100vh;
+        min-height: 100vh;
+        overflow: hidden;
+        display: block;
+      }
+      #app.b2-live-root {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+      }
     </style>
   </head>
   <body>

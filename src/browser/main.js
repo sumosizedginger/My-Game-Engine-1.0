@@ -20,6 +20,8 @@ import { createEngineFull, ENTRY_POINT as FULL_ENTRY_POINT } from '../full/index
 import { createPongGame } from '../games/pong/index.js';
 import { createB1Viewer } from './b1-viewer.js';
 import { createB2Viewer } from './b2-viewer.js';
+import { createB2LivePresentation } from './b2-presentation.js';
+import './b2-live.css';
 
 const params = new URLSearchParams(window.location.search);
 const isB2Mode = params.get('proof') === 'b2';
@@ -34,7 +36,12 @@ if (isB2Mode) {
   // PROOF B2: PROCEDURAL COMBAT ROOM
   // ==========================================
   if (app) {
-    app.innerHTML = `
+    if (!isControlled) {
+      document.documentElement.classList.add('b2-live-mode');
+      document.body.classList.add('b2-live-mode');
+      app.classList.add('b2-live-root');
+    }
+    app.innerHTML = isControlled ? `
       <div style="display: flex; flex-direction: column; align-items: center; max-width: 960px; width: 100%; margin: 16px auto; padding: 0 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; box-sizing: border-box;">
         <!-- Top Navigation -->
         <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 12px;">
@@ -127,7 +134,7 @@ if (isB2Mode) {
           ${isControlled ? 'PROOF_B2_CONTROLLED_FIXTURE' : `Active Combat Loop (${ENGINE_VERSION})`}
         </div>
       </div>
-    `;
+    ` : createB2LivePresentation();
 
     const container = document.getElementById('b2-canvas-container');
     createB2Viewer({ container, isControlled });
