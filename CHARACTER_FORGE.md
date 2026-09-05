@@ -62,27 +62,27 @@ limbSegments        8         24        12         count
 
 ## 3. Semantic Landmarks
 
-Semantic landmarks provide definition-space 3D vectors $\{x, y, z\}$ for skeletal joints and attachment points:
+Semantic landmarks provide definition-space 3D vectors $\{x, y, z\}$ for skeletal joints and attachment points. These are the current deterministic definition-space landmark formulas computed by `computeSemanticLandmarks()`:
 
 ```text
 Spine Chain:
   root       -> (0, 0, 0)
-  pelvis     -> (0, hipY, 0)
-  spine      -> (0, waistY, -0.005)
-  chest      -> (0, chestY, 0.005)
-  neck       -> (0, neckBaseY, 0)
-  head       -> (0, headCenterY, 0.01)
-  headApex   -> (0, height, 0)
+  pelvis     -> (0, hipY, -0.020)
+  spine      -> (0, waistY, 0.008)
+  chest      -> (0, chestY, 0.010)
+  neck       -> (0, neckBaseY, -0.010)
+  head       -> (0, headCenterY, 0.005)
+  headApex   -> (0, height, -0.010)
 
 Left Upper Limb (mirrored X for Right):
-  clavicle.L -> (shoulderHalf * 0.35, neckBaseY - 0.015, 0.01)
-  shoulder.L -> (shoulderHalf * 0.94, shoulderY, 0)
-  elbow.L    -> (shoulderHalf * 0.88, shoulderY - upperArmL, -0.01)
-  wrist.L    -> (shoulderHalf * 0.84, shoulderY - upperArmL - forearmL, 0)
-  hand.L     -> (shoulderHalf * 0.82, shoulderY - upperArmL - forearmL - handL, 0)
+  clavicle.L -> (shoulderHalf * 0.35, neckBaseY - 0.015, 0.005)
+  shoulder.L -> (shoulderHalf * 0.86, shoulderY, 0.002)
+  elbow.L    -> (shoulderHalf * 0.82, shoulderY - upperArmL, -0.015)
+  wrist.L    -> (shoulderHalf * 0.78, shoulderY - upperArmL - forearmL, 0)
+  hand.L     -> (shoulderHalf * 0.76, shoulderY - upperArmL - forearmL - handL, 0)
 
 Left Lower Limb (mirrored X for Right):
-  hip.L      -> (hipHalf, hipY, 0)
+  hip.L      -> (hipHalf, hipY, -0.015)
   knee.L     -> (hipHalf, hipY - thighL, 0.012)
   ankle.L    -> (hipHalf, footH, 0)
   heel.L     -> (hipHalf, 0, -footLength * 0.30)
