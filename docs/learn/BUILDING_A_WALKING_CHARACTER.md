@@ -110,10 +110,12 @@ Three canonical presets are frozen in `HUMANOID_PRESETS`:
 - **`heavy`**: Broader, thicker torso and limbs ($H = 1.78\text{ m}$, chest width $0.23\text{ m}$, waist width $0.20\text{ m}$, leg mass $1.30$).
 
 ### 3.3 Defensive Parameter Resolution
-The function `resolveHumanoidParameters(raw)` sanitizes incoming definitions:
-- Unknown presets trigger a structured diagnostic warning (`WARN_UNKNOWN_PRESET`) and fall back safely to `average`.
-- Numeric values are clamped to their valid min/max domain, logging `WARN_PARAM_CLAMPED` if modified.
-- Returns an immutable, frozen parameters record.
+The function `resolveHumanoidParameters(input)` sanitizes incoming definitions and records machine-readable diagnostics:
+- **Unknown String Preset**: Logs warning `CHAR_UNKNOWN_PRESET` and falls back safely to `average`.
+- **Invalid / Non-numeric Parameter**: If a parameter is `NaN` or not a number, logs warning `CHAR_INVALID_PARAM` and substitutes the schema default.
+- **Parameter Below Minimum**: Values below minimum trigger warning `CHAR_PARAM_CLAMPED_MIN` and clamp to `min`.
+- **Parameter Above Maximum**: Values above maximum trigger warning `CHAR_PARAM_CLAMPED_MAX` and clamp to `max`.
+- Returns an immutable, frozen parameters record along with the diagnostics array.
 
 ---
 
@@ -364,6 +366,7 @@ export const MOTION_PRESETS = Object.freeze({
     stepHeight: 0.040
   })
 });
+```
 
 ---
 
