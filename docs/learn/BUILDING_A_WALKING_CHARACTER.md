@@ -46,10 +46,9 @@ My-Game-Engine-1.0/
 │   │   ├── geometry.js           # Lofted axial torso/head and continuous limb tubes
 │   │   ├── skeleton.js           # Canonical 22-bone hierarchy & bind matrix setup
 │   │   ├── skinning.js           # Distance-to-segment weights, region gating, normalization
-│   │   ├── character.js          # Character class tying mesh, skeleton, and geometry
 │   │   └── index.js              # Public barrel export and buildHumanoidCharacter()
 │   ├── motion/                   # Motion Forge: Procedural Kinematics & Locomotion
-│   │   ├── definition.js         # Locomotion parameters, presets (natural, brisk, slow)
+│   │   ├── definition.js         # Locomotion parameters, presets (natural, energetic, stroll)
 │   │   ├── ik.js                 # Closed-form analytical 2-bone IK solver
 │   │   ├── grounding.js          # Foot placement, heel strike, midstance, toe push-off
 │   │   ├── generator.js          # Gait phase timeline, pelvis dynamics, arm swings
@@ -302,20 +301,69 @@ In [`src/motion/definition.js`](../../src/motion/definition.js), locomotion is d
 // Excerpt from src/motion/definition.js
 export const MOTION_PARAMETER_BOUNDS = Object.freeze({
   cadence: { min: 60, max: 160, default: 112 },           // Steps per minute
-  strideLength: { min: 0.40, max: 1.80, default: 1.25 },   // Full 2-step stride (m)
-  stepHeight: { min: 0.02, max: 0.15, default: 0.055 },    // Swing foot lift (m)
-  verticalBounce: { min: 0.00, max: 0.08, default: 0.028 },// Pelvis vertical dip (m)
-  lateralSway: { min: 0.00, max: 0.08, default: 0.022 },   // Pelvis sway toward stance leg (m)
-  pelvisRoll: { min: 0.00, max: 0.15, default: 0.045 },    // Pelvis coronal tilt (rad)
-  pelvisYaw: { min: 0.00, max: 0.25, default: 0.080 },     // Pelvis transverse rotation (rad)
-  torsoCounter: { min: 0.00, max: 1.00, default: 0.60 },   // Upper body counter-twist
-  armSwing: { min: 0.10, max: 0.90, default: 0.45 },       // Shoulder pitch amplitude (rad)
-  elbowFlex: { min: 0.10, max: 0.80, default: 0.35 },      // Forearm flexion amplitude (rad)
-  wristLag: { min: 0.00, max: 0.30, default: 0.12 }        // Hand drag angle (rad)
+  strideLength: { min: 0.60, max: 2.00, default: 1.30 },   // Meters per full 2-step cycle
+  verticalBounce: { min: 0.005, max: 0.060, default: 0.028 }, // Meters of pelvis bounce
+  pelvisRoll: { min: 0.01, max: 0.15, default: 0.065 },    // Radians of pelvic lateral tilt
+  pelvisYaw: { min: 0.02, max: 0.20, default: 0.090 },     // Radians of pelvic transverse rotation
+  lateralSway: { min: 0.005, max: 0.060, default: 0.022 }, // Meters of lateral weight shift
+  armSwing: { min: 0.10, max: 0.80, default: 0.38 },       // Radians of shoulder swing
+  elbowFlex: { min: 0.10, max: 0.90, default: 0.45 },      // Radians of elbow flexion during forward swing
+  wristLag: { min: 0.02, max: 0.25, default: 0.08 },       // Radians of wrist secondary lag
+  torsoCounter: { min: 0.30, max: 1.00, default: 0.75 },   // Torso counter-rotation factor relative to pelvis
+  stepHeight: { min: 0.02, max: 0.12, default: 0.055 }     // Meters of foot clearance during swing
 });
 ```
 
-Standard presets include `natural` (112 spm, balanced stride), `brisk` (128 spm, athletic walk), and `slow` (92 spm, relaxed stroll).
+### 9.2 Standard Motion Presets
+
+Three canonical presets are defined in `MOTION_PRESETS`:
+- **`natural`**: Baseline balanced everyday walk (112 steps/min, 1.30 m stride, 0.028 m bounce, 0.38 rad arm swing).
+- **`energetic`**: Faster athletic stride with exaggerated arm swing and pelvic dynamics (128 steps/min, 1.50 m stride, 0.038 m bounce, 0.52 rad arm swing).
+- **`stroll`**: Slower, relaxed stride with reduced bounce and sway (92 steps/min, 1.10 m stride, 0.018 m bounce, 0.25 rad arm swing).
+
+```javascript
+// Excerpt from src/motion/definition.js
+export const MOTION_PRESETS = Object.freeze({
+  natural: Object.freeze({
+    cadence: 112,
+    strideLength: 1.30,
+    verticalBounce: 0.028,
+    pelvisRoll: 0.065,
+    pelvisYaw: 0.090,
+    lateralSway: 0.022,
+    armSwing: 0.38,
+    elbowFlex: 0.45,
+    wristLag: 0.08,
+    torsoCounter: 0.75,
+    stepHeight: 0.055
+  }),
+  energetic: Object.freeze({
+    cadence: 128,
+    strideLength: 1.50,
+    verticalBounce: 0.038,
+    pelvisRoll: 0.080,
+    pelvisYaw: 0.110,
+    lateralSway: 0.026,
+    armSwing: 0.52,
+    elbowFlex: 0.60,
+    wristLag: 0.12,
+    torsoCounter: 0.85,
+    stepHeight: 0.070
+  }),
+  stroll: Object.freeze({
+    cadence: 92,
+    strideLength: 1.10,
+    verticalBounce: 0.018,
+    pelvisRoll: 0.045,
+    pelvisYaw: 0.065,
+    lateralSway: 0.016,
+    armSwing: 0.25,
+    elbowFlex: 0.30,
+    wristLag: 0.05,
+    torsoCounter: 0.60,
+    stepHeight: 0.040
+  })
+});
 
 ---
 
@@ -541,7 +589,7 @@ This clean seam allows the exact same character and motion system to operate bot
 
 In [`src/browser/b1-viewer.js`](../../src/browser/b1-viewer.js), the character and motion engines are wired into an interactive browser studio:
 - **WebGL Rendering**: Three.js standard shaded renderer with studio key lighting and an infinite ground grid.
-- **Interactive Controls**: Preset dropdowns (`average`, `athletic`, `heavy`), motion speed dropdowns, slow-motion (0.25x), wireframe toggle, and skeleton bone overlay.
+- **Interactive Controls**: Character preset dropdown (`average`, `athletic`, `heavy`), motion preset dropdown (`natural`, `energetic`, `stroll`), slow-motion (0.25x), in-place treadmill toggle, wireframe toggle, and skeleton bone overlay.
 - **Live DOM HUD**: Real-time display of cycle phase, speed, foot contact states (STANCE vs SWING), pelvic bounce and sway, and skinning normalization status ($\sum w = 1.0$).
 - **Headless Evaluation Bridge**: Exposes `window.__PROOF_B1_MOTION__` with step control, realized foot position queries, and geometry statistics for automated testing.
 
