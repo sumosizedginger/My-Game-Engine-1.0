@@ -3,6 +3,7 @@
  * Canonical repository: sumosizedginger/My-Game-Engine-1.0
  *
  * Drives headless browser validation using puppeteer-core and local Chrome/Edge.
+ * Supports both Phase 0 Boot Proof and Proof A Pong gameplay evaluation.
  */
 
 import fs from 'node:fs';
@@ -96,7 +97,18 @@ export function runBrowserEvaluation({
       const response = await page.goto(url, { waitUntil: 'load', timeout });
       const httpStatus = response ? response.status() : 0;
 
-      // Extract boot proof object
+      // Wait for engine module initialization
+      try {
+        if (url.includes('game=pong')) {
+          await page.waitForFunction(() => Boolean(window.__PROOF_A_PONG__), { timeout: 6000 });
+        } else {
+          await page.waitForFunction(() => Boolean(window.__PHASE_0_BOOT_PROOF__), { timeout: 6000 });
+        }
+      } catch (waitErr) {
+        console.warn(`[BrowserEval] Timeout waiting for boot window object on ${url}:`, waitErr.message);
+      }
+
+      // Extract boot proof object if on Phase 0 boot page
       const bootProof = await page.evaluate(() => {
         return window.__PHASE_0_BOOT_PROOF__ || null;
       });
@@ -107,18 +119,87 @@ export function runBrowserEvaluation({
         const bootStatus = document.getElementById('boot-status')?.textContent?.trim() || '';
         const repoId = document.getElementById('repo-id')?.textContent?.trim() || '';
         const toolchainLabel = document.getElementById('toolchain-label')?.textContent?.trim() || '';
-        return { engineTitle, bootStatus, repoId, toolchainLabel };
+        const matchStatusBadge = document.getElementById('match-status-badge')?.textContent?.trim() || '';
+        const p1Score = document.getElementById('p1-score')?.textContent?.trim() || '';
+        const p2Score = document.getElementById('p2-score')?.textContent?.trim() || '';
+        return { engineTitle, bootStatus, repoId, toolchainLabel, matchStatusBadge, p1Score, p2Score };
       });
 
+      // Capture deterministic initial baseline screenshot BEFORE executing interactive simulation
       let screenshotBuffer = null;
       if (captureScreenshot) {
         screenshotBuffer = await page.screenshot({ type: 'png' });
+      }
+
+      // If evaluating Proof A Pong, run in-browser gameplay and rule verification
+      let pongProof = null;
+      if (url.includes('game=pong')) {
+        pongProof = await page.evaluate(() => {
+          try {
+            if (!window.__PROOF_A_PONG__) {
+              return { success: false, error: 'window.__PROOF_A_PONG__ not found' };
+            }
+            const game = window.__PROOF_A_PONG__;
+            const initial = game.getState();
+
+            // 1. Initial serve state check
+            const isInitialServe = initial.status === 'SERVE' && initial.scores.player1 === 0 && initial.scores.player2 === 0;
+
+            // 2. Action input verification: MoveUp moves player paddle
+            game.simulateAction('MoveUp', true);
+            for (let i = 0; i < 3; i++) {
+              game.stepOnce(20);
+            }
+            game.simulateAction('MoveUp', false);
+            const afterMove = game.getState();
+            const movedUp = afterMove.entities.player.position.y > initial.entities.player.position.y;
+            const inPlaying = afterMove.status === 'PLAYING';
+
+            // 3. Goal scoring rule execution
+            game.transformManager.teleport(afterMove.entities.ball.handle, { x: 395, y: 0, z: 0 });
+            game.transformManager.setVelocity(afterMove.entities.ball.handle, { x: 500, y: 0, z: 0 });
+            for (let i = 0; i < 4; i++) {
+              game.stepOnce(20);
+            }
+
+            const afterScore = game.getState();
+            const scoredPoint = afterScore.scores.player1 === 1 && afterScore.status === 'SERVE';
+
+            // 4. DOM HUD update verification
+            const p1Dom = document.getElementById('p1-score')?.textContent?.trim();
+            const domScoreUpdated = p1Dom === '1';
+
+            return {
+              success: Boolean(isInitialServe && movedUp && inPlaying && scoredPoint && domScoreUpdated),
+              checks: {
+                isInitialServe,
+                movedUp,
+                inPlaying,
+                scoredPoint,
+                domScoreUpdated,
+                initialY: initial.entities.player.position.y,
+                afterMoveY: afterMove.entities.player.position.y,
+                ballAfterScoreX: afterScore.entities.ball.position.x,
+                scoreP1: afterScore.scores.player1,
+                domP1: p1Dom
+              },
+              diagnosticsRecords: afterScore.diagnostics
+            };
+          } catch (evalErr) {
+            return {
+              success: false,
+              evalError: evalErr.message,
+              stack: evalErr.stack
+            };
+          }
+        });
       }
 
       return {
         url,
         httpStatus,
         bootProof,
+        pongProof,
         domDetails,
         consoleErrors,
         consoleWarnings,

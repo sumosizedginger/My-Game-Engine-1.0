@@ -11,6 +11,15 @@ export const ENGINE_VERSION = '0.1.0';
 export const CANONICAL_REPOSITORY = 'sumosizedginger/My-Game-Engine-1.0';
 export const ENTRY_POINT = 'engine/runtime';
 
+// Gameplay Foundation Primitives (Proof A)
+export * from './entities.js';
+export * from './transforms.js';
+export * from './clock.js';
+export * from './input.js';
+export * from './collision.js';
+export * from './state.js';
+export * from './rules.js';
+
 /**
  * Creates a structured diagnostic record adhering to CONSTITUTION.md & ARCHITECTURE.md.
  * Shape: { severity, code, step, subsystem, message, data }

@@ -12,8 +12,10 @@
  */
 
 import { createRuntime } from '../runtime/index.js';
+import { compileDefinition } from './compiler.js';
 
 export * from '../runtime/index.js';
+export { compileDefinition };
 
 export const ENTRY_POINT = 'engine/full';
 
