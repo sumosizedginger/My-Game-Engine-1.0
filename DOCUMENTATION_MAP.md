@@ -346,6 +346,9 @@ Relevant concerns:
 - static export;
 - controller/keyboard abstraction.
 
+Operational note:
+See `TESTING_AND_VALIDATION.md` §22.1 for evaluation harness operations covering Proof A targets, checks (`pongBoot`, `pongGameplay`, `pongScoring`), and capture fixtures.
+
 Do not import later character/world complexity.
 
 ---

@@ -218,7 +218,10 @@ DO transitionState('GAME_OVER')
 Proof A establishes the legitimate definition-to-artifact compile seam:
 
 1. **Definition**: `PongArenaDefinition`, `PaddlePrefabDefinition`, `BallPrefabDefinition` (declarative objects defining dimensions, speeds, colors, and capabilities).
-2. **Compiler Step**: `compileDefinition(definition)` validates required fields, computes deterministic SHA-256 hash, and emits a frozen `Artifact`.
+2. **Compiler Step**: `compileDefinition(definition)` validates required fields, computes a deterministic pure-JS content fingerprint, and emits a frozen `Artifact`.
+   - **Non-Cryptographic Fingerprint**: The current implementation computes a fast, deterministic pure-JS content fingerprint (~48-bit hex string). It is **not** SHA-256 and is **non-cryptographic**. It provides deterministic content identity within current Proof A scope without introducing browser async `crypto.subtle` requirements or Node-specific dependencies into the synchronous compiler seam.
+   - **Metadata Separation**: The `compiledAt` timestamp is runtime compile metadata and is explicitly excluded from the deterministic content fingerprint, preserving stable identity across identical definition compilations.
+   - **Cryptographic Provenance**: Cryptographic artifact provenance and integrity hashing (e.g. SHA-256) is **future work** and should only be introduced when a later proof or export distribution workflow actually requires it.
 3. **Instantiate Step**: `runtime.instantiate(artifact)` creates runtime entities and attaches transform/renderable state.
 
 Purity invariant: `compileDefinition` is isolated to the full/authoring seam and does not pollute `engine/runtime`.

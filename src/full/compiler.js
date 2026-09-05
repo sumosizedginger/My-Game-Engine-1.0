@@ -8,10 +8,12 @@
  */
 
 /**
- * Generates a simple deterministic hash string from serializable object.
+ * Generates a simple deterministic pure-JS content fingerprint from a serializable object.
+ * Intentionally non-cryptographic and NOT SHA-256; provides synchronous deterministic
+ * content identity within Proof A scope without async WebCrypto dependencies.
  *
  * @param {object} obj
- * @returns {string} Hex hash string.
+ * @returns {string} Hex fingerprint string.
  */
 function computeDeterministicHash(obj) {
   const str = JSON.stringify(obj, Object.keys(obj || {}).sort());
