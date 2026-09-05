@@ -168,6 +168,7 @@ npm install / npm ci
 npm test
 npm run build
 npm run dev
+npm run eval
 ```
 
 Additional commands may be earned when needed, for example:
@@ -577,6 +578,30 @@ When captures become canonical evidence:
 - do not accept a changed baseline merely to make a test green.
 
 A baseline change should correspond to an accepted visual change.
+
+### 22.1 A0 Evaluation Harness Operations
+
+The A0 evaluation harness (`src/eval/*`) provides automated, headless real-browser validation and deterministic evidence capture:
+
+- **Command**: `npm run eval`
+  - Exit code `0` = PASS.
+  - Exit code `1` = FAIL.
+  - Executes headless real-browser validation (`puppeteer-core`).
+- **Default Target**: `http://localhost:5173/?controlled=1`
+  - Automatically spawns and terminates a transient local Vite dev server if one is not already running.
+  - Reuses an existing active dev server if port 5173 is already listening.
+  - The `?controlled=1` fixture parameter ensures deterministic timestamp rendering for repeatable visual diffing.
+- **Report Output**: `artifacts/evaluation-report.json`
+  - Machine-readable JSON report (`schemaVersion: "1.0.0"`).
+  - Report keys: `status`, `revision`, `checks`, `diagnostics`, `telemetry`, `captures`, `browserDetails`.
+- **Capture Output**: `artifacts/captures/<name>.png`
+  - Baseline capture fixture: `artifacts/captures/phase0_boot_fixture.png`.
+  - Captures record SHA-256 integrity hash, byte size, viewport dimensions, and git revision metadata.
+- **Browser Discovery**:
+  - Automatically locates local system-installed Chrome or Edge.
+  - Can be explicitly overridden using the `CHROME_PATH` environment variable.
+- **Artifacts & Git**:
+  - The `artifacts/` directory is intentionally ignored in `.gitignore` because it contains generated run-specific evaluation evidence.
 
 ---
 

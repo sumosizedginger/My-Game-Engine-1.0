@@ -302,6 +302,9 @@ Focus:
 - exact revision reporting;
 - comparison/evaluation infrastructure.
 
+Operational note:
+See `TESTING_AND_VALIDATION.md` §22.1 for canonical evaluation operations (`npm run eval`, `artifacts/evaluation-report.json`, `artifacts/captures/`, and `src/eval/*` harness layout).
+
 Do not expand gameplay merely because test infrastructure can support it.
 
 ---
