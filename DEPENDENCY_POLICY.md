@@ -437,7 +437,7 @@ A version upgrade is its own engineering change when it materially affects:
 
 Unless a verified incompatibility requires change, use:
 
-`Node 24.19.0`
+`Node 24.20.0`
 
 Pin it consistently using the repository mechanisms established during Phase 0.
 

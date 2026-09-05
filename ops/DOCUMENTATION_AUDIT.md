@@ -17,7 +17,7 @@ The bootstrap documentation set is aligned around the corrected project truth: M
 - [x] **14 bootstrap files present** — All 14 expected bootstrap Markdown files are present.
 - [x] **Canonical repo named** — Canonical repository identifier appears across the set.
 - [x] **Greenfield truth explicit** — Core orientation/authority docs explicitly identify the repository as greenfield.
-- [x] **Node pin consistent** — Node 24.19.0 appears consistently in tooling-governing docs.
+- [x] **Node pin consistent** — Node 24.20.0 appears consistently in tooling-governing docs.
 - [x] **Canonical count bounded** — The 21-document canonical ceiling is represented consistently.
 - [x] **Bootstrap count represented** — README states 12 canonical + two adapters; Documentation Map states the physical bootstrap total of 14.
 - [x] **Two entry points represented** — Core product/architecture docs contain both engine entry-point directions.

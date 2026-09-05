@@ -468,7 +468,7 @@ Learning documents never override canonical architecture.
 
 Unless a verified incompatibility requires change:
 
-- Node: `24.19.0`
+- Node: `24.20.0`
 - canonical branch: `main`
 
 Pin the Node version consistently.

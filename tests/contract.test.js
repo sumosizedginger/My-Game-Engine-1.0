@@ -8,6 +8,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
+const APPROVED_NODE_VERSION = '24.20.0';
+
 const REQUIRED_BOOTSTRAP_DOCS = [
   'README.md',
   'CONSTITUTION.md',
@@ -34,14 +36,32 @@ test('all 14 bootstrap documentation files exist in root and are non-empty', () 
   }
 });
 
-test('Node 24.20.0 is consistently pinned across .nvmrc, .node-version, and package.json', () => {
+test('approved Node version is consistently pinned across executable configs and canonical documentation', () => {
+  // 1. Executable repository configuration
   const nvmrc = fs.readFileSync(path.join(rootDir, '.nvmrc'), 'utf8').trim();
   const nodeVersion = fs.readFileSync(path.join(rootDir, '.node-version'), 'utf8').trim();
   const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 
-  assert.equal(nvmrc, '24.20.0', '.nvmrc must pin 24.20.0');
-  assert.equal(nodeVersion, '24.20.0', '.node-version must pin 24.20.0');
-  assert.equal(pkg.engines?.node, '24.20.0', 'package.json engines.node must pin 24.20.0');
+  assert.equal(nvmrc, APPROVED_NODE_VERSION, `.nvmrc must pin ${APPROVED_NODE_VERSION}`);
+  assert.equal(nodeVersion, APPROVED_NODE_VERSION, `.node-version must pin ${APPROVED_NODE_VERSION}`);
+  assert.equal(pkg.engines?.node, APPROVED_NODE_VERSION, `package.json engines.node must pin ${APPROVED_NODE_VERSION}`);
+
+  // 2. Canonical toolchain-governing documentation
+  const docsToCheck = [
+    { file: 'README.md', pattern: `Node ${APPROVED_NODE_VERSION}` },
+    { file: 'PRD.md', pattern: `Node ${APPROVED_NODE_VERSION}` },
+    { file: 'ROADMAP.md', pattern: `Node \`${APPROVED_NODE_VERSION}\`` },
+    { file: 'AGENTS.md', pattern: `- Node: \`${APPROVED_NODE_VERSION}\`` },
+    { file: 'DEPENDENCY_POLICY.md', pattern: `\`Node ${APPROVED_NODE_VERSION}\`` }
+  ];
+
+  for (const { file, pattern } of docsToCheck) {
+    const content = fs.readFileSync(path.join(rootDir, file), 'utf8');
+    assert.ok(
+      content.includes(pattern),
+      `${file} must document approved Node target ${APPROVED_NODE_VERSION} (expected pattern: "${pattern}")`
+    );
+  }
 });
 
 test('package.json defines canonical identity, Vite 8.2.2 devDependency, and required exports', () => {

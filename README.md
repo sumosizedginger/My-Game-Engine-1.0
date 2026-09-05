@@ -100,7 +100,7 @@ A tiny exported game should not ship the entire authoring/compiler toolchain by 
 Unless a concrete incompatibility is proven during bootstrap, pin:
 
 ```text
-Node 24.19.0
+Node 24.20.0
 ```
 
 Phase 0 must establish documented commands for install, build, test, and browser/dev-server boot. Until Phase 0 is accepted, do not invent commands in documentation and pretend they work.

@@ -21,10 +21,10 @@ const results = {
   version: ENGINE_VERSION,
   repository: CANONICAL_REPOSITORY,
   timestamp: new Date().toISOString(),
-  toolchain: {
-    nodeTarget: '24.20.0 LTS',
-    npmVersion: '11.19.1',
-    viteVersion: '8.2.2'
+  canonicalToolchainTarget: {
+    node: '24.20.0',
+    npm: '11.19.1',
+    vite: '8.2.2'
   },
   checks: {}
 };
@@ -109,8 +109,11 @@ if (app) {
         </ul>
       </div>
 
-      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #334155; font-size: 12px; color: #64748b; text-align: center;">
-        Booted at: ${results.timestamp} | Node ${results.toolchain.nodeTarget} | npm ${results.toolchain.npmVersion} | Vite ${results.toolchain.viteVersion}
+      <div id="toolchain-target-card" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #334155; font-size: 12px; color: #64748b; text-align: center;">
+        <div>Booted at: ${results.timestamp}</div>
+        <div id="toolchain-label" style="margin-top: 4px; color: #94a3b8; font-weight: 500;">
+          Canonical Toolchain Target: Node ${results.canonicalToolchainTarget.node} | npm ${results.canonicalToolchainTarget.npm} | Vite ${results.canonicalToolchainTarget.vite}
+        </div>
       </div>
     </div>
   `;
