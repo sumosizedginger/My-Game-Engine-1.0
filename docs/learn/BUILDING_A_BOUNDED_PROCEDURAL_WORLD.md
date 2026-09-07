@@ -154,7 +154,7 @@ Key features:
 - Resolution $N = 128$ yields $129 \times 129 = 16,641$ grid samples.
 - Height combines a base value noise layer with a quarter-amplitude octave for fine undulating relief.
 - Forest weighting combines moisture thresholding with a fixed clearing centered at $(-12, 8)$ (`clearing = Math.exp(-((wx + 12)**2 + (wz - 8)**2) / 320)`), providing a natural meadow transition.
-- The cache produces a deterministic SHA hash verifying cross-process data integrity.
+- The cache produces a deterministic regression checksum verifying cross-process data integrity.
 
 ---
 
@@ -502,7 +502,7 @@ Proof C builds directly on the material compiler established in Proof B2:
 - `world-ground-cover`: Meadow grass blades (`#85934f`).
 - `world-player`: Athletic clay (`#e6a34c`).
 
-Zero new material compiler features or shader libraries were introduced.
+Beyond the bounded, opt-in `vertexColors` resolved parameter added for Proof C terrain splatting (documented in `MATERIAL_FORGE.md` §6), no new shader libraries or pipeline machinery were introduced.
 
 ---
 
