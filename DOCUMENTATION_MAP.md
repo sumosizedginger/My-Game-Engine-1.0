@@ -115,6 +115,7 @@ Entry points:
 - `docs/learn/BUILDING_A_TINY_GAME.md`
 - `docs/learn/BUILDING_A_WALKING_CHARACTER.md`
 - `docs/learn/BUILDING_A_PROCEDURAL_COMBAT_ROOM.md`
+- `docs/learn/BUILDING_A_BOUNDED_PROCEDURAL_WORLD.md`
 
 Learning documents do not override canonical architecture.
 
@@ -492,8 +493,10 @@ Do not prebuild huge-world streaming.
 Implementation routing: `src/world/index.js` owns bounded generation and queries;
 `src/games/world/` owns traversal and its controlled proof; `src/browser/c-viewer.js`
 owns live/controlled presentation. See `tests/world.test.js` and
-`tests/world-browser.test.js` for actual contracts. Independent acceptance remains
-separate; no Proof C learning material is part of this routing.
+`tests/world-browser.test.js` for actual contracts.
+
+Learning note:
+See `docs/learn/BUILDING_A_BOUNDED_PROCEDURAL_WORLD.md` for the accepted world-generation/traversal walkthrough.
 
 ---
 
