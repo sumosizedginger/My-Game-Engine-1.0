@@ -207,7 +207,7 @@ export function createWorldFieldQuery(cache) {
     const interpolate = field => ids.reduce((s, id, i) => s + field[id] * weights[i], 0);
     const h = cache.height;
     const dx = u + v <= 1 ? (h[a + 1] - h[a]) / spacing : (h[a + n + 2] - h[a + n + 1]) / spacing;
-    const dz = u + v <= 1 ? (h[a + n + 1] - h[a]) / spacing : (h[a + n + 2] - h[a + n + 1]) / spacing;
+    const dz = u + v <= 1 ? (h[a + n + 1] - h[a]) / spacing : (h[a + n + 2] - h[a + 1]) / spacing;
     const length = Math.hypot(dx, 1, dz), weight = interpolate(cache.forest);
     return { height: interpolate(h), normal: { x: -dx / length, y: 1 / length, z: -dz / length },
       slope: Math.hypot(dx, dz), moisture: interpolate(cache.moisture), forestWeight: weight,
@@ -502,7 +502,7 @@ Proof C builds directly on the material compiler established in Proof B2:
 - `world-ground-cover`: Meadow grass blades (`#85934f`).
 - `world-player`: Athletic clay (`#e6a34c`).
 
-Beyond the bounded, opt-in `vertexColors` resolved parameter added for Proof C terrain splatting (documented in `MATERIAL_FORGE.md` §6), no new shader libraries or pipeline machinery were introduced.
+Beyond the bounded, opt-in `vertexColors` resolved parameter added for Proof C terrain vertex-color blending (documented in `MATERIAL_FORGE.md` §6), no new shader libraries or pipeline machinery were introduced.
 
 ---
 
