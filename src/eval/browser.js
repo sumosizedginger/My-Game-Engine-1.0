@@ -72,6 +72,7 @@ export function runBrowserEvaluation({
 
     try {
       const page = await browser.newPage();
+      if (url.includes('proof=c')) await page.setCacheEnabled(false);
       await page.setViewport(viewport);
 
       page.on('console', (msg) => {
@@ -99,7 +100,9 @@ export function runBrowserEvaluation({
 
       // Wait for engine module initialization based on target URL
       try {
-        if (url.includes('proof=b2')) {
+        if (url.includes('proof=c')) {
+          await page.waitForFunction(() => Boolean(window.__PROOF_C_WORLD__), { timeout: 6000 });
+        } else if (url.includes('proof=b2')) {
           await page.waitForFunction(() => Boolean(window.__PROOF_B2_COMBAT__), { timeout: 6000 });
         } else if (url.includes('proof=b1')) {
           await page.waitForFunction(() => Boolean(window.__PROOF_B1_MOTION__), { timeout: 6000 });
@@ -426,6 +429,15 @@ export function runBrowserEvaluation({
         });
       }
 
+      let cProof = null;
+      if (url.includes('proof=c')) {
+        cProof = await page.evaluate(async () => {
+          try { return await window.__PROOF_C_WORLD__.runProof(); }
+          catch (error) { return { success: false, error: error.message, stack: error.stack }; }
+        });
+        if (captureScreenshot) screenshotBuffer = await page.screenshot({ type: 'png' });
+      }
+
       return {
         url,
         httpStatus,
@@ -433,6 +445,7 @@ export function runBrowserEvaluation({
         pongProof,
         b1Proof,
         b2Proof,
+        cProof,
         domDetails,
         consoleErrors,
         consoleWarnings,

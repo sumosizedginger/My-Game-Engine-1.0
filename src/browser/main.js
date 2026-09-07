@@ -31,7 +31,10 @@ const isControlled = params.has('controlled');
 
 const app = document.getElementById('app');
 
-if (isB2Mode) {
+if (params.get('proof') === 'c') {
+  const { createCViewer } = await import('./c-viewer.js');
+  createCViewer(app, { controlled: isControlled, seed: params.has('seed') ? Number(params.get('seed')) : undefined });
+} else if (isB2Mode) {
   // ==========================================
   // PROOF B2: PROCEDURAL COMBAT ROOM
   // ==========================================

@@ -94,7 +94,8 @@ export function createLocomotionEvaluator(character, motionOptions = 'natural') 
     // -------------------------------------------------------------
     // Dynamic locomotion dip + biological gait bounce: dips at heel strikes, rises at midstance
     const gaitDip = -0.024;
-    const bounceY = gaitDip - motionParams.verticalBounce * 0.5 * (1.0 + Math.cos(fourPi * phase));
+    let bounceY = gaitDip - motionParams.verticalBounce * 0.5 * (1.0 + Math.cos(fourPi * phase))
+      - (options.groundAt ? 0.06 : 0);
     // Lateral sway: shifts toward stance leg
     const swayX = motionParams.lateralSway * Math.sin(twoPi * phase);
     // Pelvis roll (Z-axis tilt): drops unsupported hip
@@ -167,6 +168,43 @@ export function createLocomotionEvaluator(character, motionOptions = 'natural') 
       hipX: landmarks['hip.R'].x
     });
 
+    // Optional terrain samples are character-local; the caller owns world queries and transforms.
+    // Flat-ground callers execute the original path unchanged.
+    for (const placement of [footPlacementL, footPlacementR]) {
+      if (options.groundAt) {
+        if (options.standing) {
+          placement.targetPos.z = 0;
+          placement.targetPos.y = footH;
+          placement.inContact = true;
+        }
+        const ground = options.groundAt(placement.targetPos.x, placement.targetPos.z);
+        if (!ground || !Number.isFinite(ground.height) || (ground.normal &&
+          (![ground.normal.x, ground.normal.y, ground.normal.z].every(Number.isFinite) || ground.normal.y <= 0 ||
+          Math.abs(Math.hypot(ground.normal.x, ground.normal.y, ground.normal.z) - 1) > 0.001))) {
+          const error = new Error('Invalid locomotion ground sample'); error.code = 'MOTION_INVALID_GROUND_SAMPLE'; throw error;
+        }
+        // A sole oriented to a slope needs its ankle offset measured along that plane.
+        const soleOffset = ground.normal ? footH * (1 / ground.normal.y - 1) : 0;
+        placement.targetPos.y += ground.height + soleOffset;
+        placement.groundHeight = ground.height;
+        placement.groundNormal = ground.normal;
+        // Terrain stance and swing keep the sole parallel to the sampled plane.
+        // Flat-ground toe roll pivots about the ankle and would drive toes below slopes.
+        placement.pitchAngle = 0;
+        if (placement.inContact) {
+          placement.targetPos.y = footH + ground.height + soleOffset;
+        }
+      }
+    }
+
+    // Lower the pelvis toward the downhill foot, preserving leg reach on slopes.
+    if (options.groundAt && bonesByName.pelvis) {
+      const drop = Math.min(0, footPlacementL.groundHeight, footPlacementR.groundHeight);
+      bounceY += drop;
+      bonesByName.pelvis.position.y += drop;
+      bonesByName.pelvis.updateWorldMatrix(true, false);
+    }
+
     // Solve Left Leg IK in character root space (independent of mesh world position)
     if (bonesByName.thigh_l && bonesByName.shin_l && bonesByName.foot_l) {
       _hipWorldPosL.copy(bonesByName.thigh_l.position)
@@ -196,6 +234,7 @@ export function createLocomotionEvaluator(character, motionOptions = 'natural') 
 
       // Foot pitch orientation -> local quaternion relative to parent shin
       _qFootWorld.setFromAxisAngle(_xAxis, footPlacementL.pitchAngle);
+      if (footPlacementL.groundNormal) _qFootWorld.premultiply(new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), new Vector3().copy(footPlacementL.groundNormal).normalize()));
       _qFootLocal.copy(_qShinWorld).invert().multiply(_qFootWorld);
       bonesByName.foot_l.quaternion.copy(_qFootLocal);
     }
@@ -226,6 +265,7 @@ export function createLocomotionEvaluator(character, motionOptions = 'natural') 
       bonesByName.shin_r.quaternion.copy(_qShinLocal);
 
       _qFootWorld.setFromAxisAngle(_xAxis, footPlacementR.pitchAngle);
+      if (footPlacementR.groundNormal) _qFootWorld.premultiply(new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), new Vector3().copy(footPlacementR.groundNormal).normalize()));
       _qFootLocal.copy(_qShinWorld).invert().multiply(_qFootWorld);
       bonesByName.foot_r.quaternion.copy(_qFootLocal);
     }

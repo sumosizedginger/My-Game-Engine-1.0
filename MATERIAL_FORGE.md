@@ -102,3 +102,12 @@ Every compliant Material Forge implementation must demonstrate:
 2. **Color Normalization**: Integer hex, 3-char hex strings, and 6-char hex strings normalize into matching RGB integer values.
 3. **Compiler Determinism**: `compileMaterial` creates valid Three.js `MeshStandardMaterial` instances with correct properties and `userData` provenance.
 4. **Unit Tests**: Full coverage in `tests/material.test.js`.
+
+## 6. Proof C vertex colors
+
+The resolved source parameter `vertexColors` is an explicit boolean, default false.
+`compileMaterial` forwards it to `MeshStandardMaterial.vertexColors` and retains it
+in material provenance. Proof C terrain supplies linear RGB vertex data generated
+from the same forest field used by ecology. No shader graph, texture generator or
+terrain megashader is introduced. Existing definitions without this parameter keep
+vertex colors disabled. Opt-in/default compilation is tested in `tests/world.test.js`.

@@ -587,7 +587,7 @@ The evaluation harness (`src/eval/*`) provides automated, headless real-browser 
   - Exit code `0` = PASS (all checks passed with zero fatal/error diagnostics).
   - Exit code `1` = FAIL (one or more checks failed or fatal errors encountered).
   - Executes headless real-browser validation (`puppeteer-core`).
-- **Default Suite Targets**: By default, `npm run eval` executes the full four-target evaluation suite:
+- **Default Suite Targets**: By default, `npm run eval` executes the full five-target evaluation suite:
   1. **Phase 0 Controlled Boot Proof**:
      - URL: `http://localhost:5173/?controlled=1`
      - Evaluates foundational engine boot and purity checks (`boot`, `runtimeMode`, `fullEngineSeam`, `purity`, `noConsoleErrors`, `noPageErrors`, `noFailedRequests`, `domStatusPass`).
@@ -617,11 +617,20 @@ The evaluation harness (`src/eval/*`) provides automated, headless real-browser 
        - `b2CombatExecution`: Verifies single authoritative attack volume evaluation, active strike window timing, hit registration, and damage application.
        - `b2WinState`: Verifies enemy HP reduction to 0 and transition to terminal `VICTORY` state.
      - Produces combat capture fixture: `artifacts/captures/proof_b2_combat_fixture.png`.
+  5. Proof C Bounded World Controlled Fixture:
+     - URL: `http://localhost:5173/?proof=c&controlled=1`
+     - Fixed default recipe/seed 87122, starting state and camera; the evaluator fixes 1280x720.
+     - Uses the real traversal coordinator through Forward 340 ticks, Right 180 ticks, Forward 720 ticks at 60 Hz, with a generated trunk collision on the first leg.
+     - Checks: `cBoot`, `cWorldGeneration`, `cFieldDeterminism`, `cTerrainQueryTruth`, `cVegetationPlacement`, `cVegetationRendering`, `cWorldVolumeQuery`, `cCharacterGrounding`, `cTraversal`, `cCollision`, `cPageProofSuccess`.
+     - Mesh truth uses independent triangle ray intersections. Vegetation rendering inspects actual trunk instance transforms. Grounding uses realized foot bones and skinned sole vertices over non-flat traversal, not only analytic target values.
+     - Every required check must be exactly true; missing values, a missing page bridge or false page success fail the target. INFO/ERROR records and measured world/traversal metrics appear under `browserDetails.targets.c.cProof`.
+     - Captures after the controlled sequence: `artifacts/captures/proof_c_world_fixture.png`. Existing targets retain their previous capture timing.
 - **Capture Fixtures**:
   - `artifacts/captures/phase0_boot_fixture.png` (Phase 0 boot proof)
   - `artifacts/captures/proof_a_pong_fixture.png` (Proof A Pong game)
   - `artifacts/captures/proof_b1_motion_fixture.png` (Proof B1 Motion truth)
   - `artifacts/captures/proof_b2_combat_fixture.png` (Proof B2 Combat room)
+  - `artifacts/captures/proof_c_world_fixture.png` (Proof C bounded world)
   - Captures record SHA-256 integrity hash, byte size, viewport dimensions (default 1280x720), format, and git revision metadata.
 - **Single-Target / Custom Evaluation**:
   - The programmatic harness (`runEvaluation({ url, captureName })`) supports single-target evaluation if a custom target URL or capture name is specified.
@@ -642,6 +651,21 @@ The evaluation harness (`src/eval/*`) provides automated, headless real-browser 
 ---
 
 ## 23. Performance Validation
+
+Proof C's automated contracts are in `tests/world.test.js` and
+`tests/world-browser.test.js`. They include seed variation/repeatability, recipe
+normalization, terrain/query agreement, ecology, volume collision, actual terrain
+grounding, failure injection, real browser keyboard input, viewport/DPR behavior,
+resource disposal/recreation, and an actual harness run whose page success is false
+while all named checks are true. B1 average/athletic/heavy realized-foot regressions
+remain required when changing terrain-aware motion. Pong's route is checked for
+absence of C world-module requests.
+
+Human review must inspect the live `?proof=c` route for coherent terrain/ecology,
+grounded vegetation, slope contact, visible trunk collision, bounded traversal,
+usable camera/canopy cutaway and resize behavior. Detailed failure criteria and
+implemented limits are in `WORLD_FORGE.md`. Browser interval measurements must
+report uncapped observed frame intervals separately from simulation delta clamps.
 
 Performance claims require measurements.
 

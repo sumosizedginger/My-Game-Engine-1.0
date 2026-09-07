@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 import { getRevisionInfo } from './revision.js';
 import { runBrowserEvaluation } from './browser.js';
+import { cTargetChecks } from './c-checks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -142,7 +143,8 @@ export async function runEvaluation(options = {}) {
     if (browserResult.screenshotBuffer) {
       let capName = options.captureName;
       if (!capName) {
-        if (phase0Url.includes('proof=b2')) capName = 'proof_b2_combat_fixture';
+        if (phase0Url.includes('proof=c')) capName = 'proof_c_world_fixture';
+        else if (phase0Url.includes('proof=b2')) capName = 'proof_b2_combat_fixture';
         else if (phase0Url.includes('proof=b1')) capName = 'proof_b1_motion_fixture';
         else if (phase0Url.includes('game=pong')) capName = 'proof_a_pong_fixture';
         else capName = 'phase0_boot_fixture';
@@ -152,7 +154,7 @@ export async function runEvaluation(options = {}) {
 
     // Baseline checks
     const checks = {
-      boot: browserResult.httpStatus === 200 && (Boolean(browserResult.bootProof) || Boolean(browserResult.pongProof) || Boolean(browserResult.b1Proof) || Boolean(browserResult.b2Proof)),
+      boot: browserResult.httpStatus === 200 && (Boolean(browserResult.bootProof) || Boolean(browserResult.pongProof) || Boolean(browserResult.b1Proof) || Boolean(browserResult.b2Proof) || Boolean(browserResult.cProof)),
       runtimeMode: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.runtimeBoot) : true,
       fullEngineSeam: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.fullEngineSeam) : true,
       purity: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.purityCheck) : true,
@@ -295,6 +297,20 @@ export async function runEvaluation(options = {}) {
       }
     }
 
+    let cResult = null;
+    if (!isCustomSingleTarget || phase0Url.includes('proof=c')) {
+      cResult = isCustomSingleTarget ? browserResult : await runBrowserEvaluation({ url: 'http://localhost:5173/?proof=c&controlled=1', viewport });
+      Object.assign(checks, cTargetChecks(cResult));
+      if (!isCustomSingleTarget) {
+        if (cResult.screenshotBuffer) captures.push(saveCapture(outputDir, 'proof_c_world_fixture', revision.commit, viewport, cResult.screenshotBuffer));
+        allConsoleErrors.push(...cResult.consoleErrors); allPageErrors.push(...cResult.pageErrors); allFailedRequests.push(...cResult.failedRequests);
+      }
+      if (cResult.consoleErrors.length) checks.noConsoleErrors = false;
+      if (cResult.pageErrors.length) checks.noPageErrors = false;
+      if (cResult.failedRequests.length) checks.noFailedRequests = false;
+      rawDiagnostics.push(...(cResult.cProof?.diagnosticsRecords || []));
+    }
+
     const diagnostics = processDiagnostics(rawDiagnostics);
     const status = Object.values(checks).every(Boolean) && !diagnostics.hasErrors ? 'PASS' : 'FAIL';
     const durationMs = Math.round((performance.now() - startTime) * 100) / 100;
@@ -331,7 +347,7 @@ export async function runEvaluation(options = {}) {
       telemetry,
       captures,
       browserDetails: {
-        url: isCustomSingleTarget ? phase0Url : 'http://localhost:5173/ (Full Suite: Phase 0 + Proof A + Proof B1 + Proof B2)',
+        url: isCustomSingleTarget ? phase0Url : 'http://localhost:5173/ (Full Suite: Phase 0 + Proof A + Proof B1 + Proof B2 + Proof C)',
         httpStatus: browserResult.httpStatus,
         dom: combinedDom,
         targets: {
@@ -353,6 +369,7 @@ export async function runEvaluation(options = {}) {
             b1Proof: b1Result.b1Proof,
             dom: b1Result.domDetails
           } : null,
+          c: cResult ? { url: cResult.url, httpStatus: cResult.httpStatus, cProof: cResult.cProof } : null,
           b2: b2Result ? {
             url: 'http://localhost:5173/?proof=b2&controlled=1',
             httpStatus: b2Result.httpStatus,

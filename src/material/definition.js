@@ -76,7 +76,8 @@ export function resolveMaterialParameters(raw = {}) {
   const resolved = {
     color: colRes.color,
     emissive: emRes.color,
-    wireframe
+    wireframe,
+    vertexColors: Boolean(input.vertexColors)
   };
 
   for (const [key, bounds] of Object.entries(MATERIAL_PARAMETER_BOUNDS)) {

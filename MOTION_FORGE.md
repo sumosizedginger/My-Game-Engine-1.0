@@ -166,3 +166,33 @@ Before declaring motion truth, procedural motion is verified against these cardi
 2. **No Ragdoll Physics**: Physical death simulations belong to later physics proofs.
 3. **No Combat Move Sets**: Punches, kicks, and hit reactions belong to Proof B2 (Combat Room).
 4. **No Transform Commits**: Motion Forge never writes directly to authoritative world coordinates.
+
+## 9. Proof C terrain samples
+
+`evaluator.update(dt, { groundAt })` optionally accepts a callback receiving each
+foot target's character-local X/Z. It returns `{height, normal?}`, where height is
+relative to the mesh root and normal is a unit upward vector in character-local
+coordinates. Nonfinite heights and invalid normals throw an error with code
+`MOTION_INVALID_GROUND_SAMPLE`. Callers without this option execute the accepted
+flat-ground path unchanged.
+
+The terrain path adds sampled elevation to ankle targets, aligns foot orientation
+to the normal and adjusts ankle height by `footH * (1 / normal.y - 1)` for the
+oriented sole. It disables ankle-pivot toe roll, which otherwise drives toes into
+slopes. The pelvis receives 0.06 m additional reach clearance and lowers by the
+minimum of zero and the two sampled relative ground heights. This is a bounded
+extension to the existing two-bone solve, not a new motion architecture.
+
+Proof C's coordinator transforms targets into world coordinates, samples
+WorldFieldQuery, and converts the result back. It advances gait by resolved travel
+distance and owns entity transform commits. Rendering projects/interpolates those
+commits without advancing gait. Realized foot bones and skinned sole vertices are
+tested against world height in `tests/world.test.js`, including non-flat samples,
+turns and the controlled traversal. The same file repeats B1's flat realized-foot
+probe for average, athletic and heavy. Terrain adaptation does not implement
+world-space foot locking, turn blending or arbitrary steps/overhangs.
+
+With terrain sampling, `standing: true` places both feet under their hips in
+contact while preserving gait phase. C uses this when actual travel stops, so an
+idle or blocked character does not retain a suspended swing foot. The transition
+is immediate; there is no new idle-animation or blend framework.

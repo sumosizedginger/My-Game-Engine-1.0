@@ -30,7 +30,8 @@ export function compileMaterial(materialInput) {
     metalness: parameters.metalness,
     emissive: new Color(parameters.emissive),
     emissiveIntensity: parameters.emissiveIntensity,
-    wireframe: parameters.wireframe
+    wireframe: parameters.wireframe,
+    vertexColors: parameters.vertexColors === true
   });
 
   material.name = definition.id;

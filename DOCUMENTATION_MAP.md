@@ -454,7 +454,7 @@ Use direct procedural construction when simpler than CSG.
 
 # 11. Proof C — Bounded Procedural World
 
-When C begins, create/read:
+For the implemented Proof C builder revision, read:
 
 ```text
 WORLD_FORGE.md
@@ -488,6 +488,12 @@ Relevant concerns:
 - traversal.
 
 Do not prebuild huge-world streaming.
+
+Implementation routing: `src/world/index.js` owns bounded generation and queries;
+`src/games/world/` owns traversal and its controlled proof; `src/browser/c-viewer.js`
+owns live/controlled presentation. See `tests/world.test.js` and
+`tests/world-browser.test.js` for actual contracts. Independent acceptance remains
+separate; no Proof C learning material is part of this routing.
 
 ---
 
