@@ -8,6 +8,70 @@
  */
 
 /**
+ * Independent copy of JSON-compatible definition data.
+ * Plain objects and arrays are rebuilt; primitives and null are returned as-is.
+ * Array order is preserved. Object key order is preserved on the copy.
+ *
+ * @param {*} value
+ * @returns {*}
+ */
+function cloneJsonValue(value) {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    const copy = new Array(value.length);
+    for (let i = 0; i < value.length; i++) {
+      copy[i] = cloneJsonValue(value[i]);
+    }
+    return copy;
+  }
+  // Define own data properties, including JSON keys such as "__proto__".
+  // Assignment to {} would invoke its inherited prototype setter instead.
+  return Object.fromEntries(Object.keys(value).map(key => [key, cloneJsonValue(value[key])]));
+}
+
+/**
+ * Recursively freeze a JSON-compatible object or array graph.
+ *
+ * @param {*} value
+ * @returns {*}
+ */
+function freezeJsonValue(value) {
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      freezeJsonValue(value[i]);
+    }
+  } else {
+    for (const key of Object.keys(value)) {
+      freezeJsonValue(value[key]);
+    }
+  }
+  return Object.freeze(value);
+}
+
+/**
+ * Serialize JSON-compatible values with sorted object keys at every depth.
+ * Emit keys directly so integer-like keys also follow the canonical sort.
+ * Arrays keep their element order. Unsupported values have no contract here.
+ *
+ * @param {*} value
+ * @returns {*}
+ */
+function serializeJsonValue(value) {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(serializeJsonValue).join(',')}]`;
+  }
+  return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${serializeJsonValue(value[key])}`).join(',')}}`;
+}
+
+/**
  * Generates a simple deterministic pure-JS content fingerprint from a serializable object.
  * Intentionally non-cryptographic and NOT SHA-256; provides synchronous deterministic
  * content identity within Proof A scope without async WebCrypto dependencies.
@@ -16,7 +80,7 @@
  * @returns {string} Hex fingerprint string.
  */
 function computeDeterministicHash(obj) {
-  const str = JSON.stringify(obj, Object.keys(obj || {}).sort());
+  const str = serializeJsonValue(obj);
   let h1 = 0xdeadbeef;
   let h2 = 0x41c64e6d;
   for (let i = 0; i < str.length; i++) {
@@ -50,13 +114,13 @@ export function compileDefinition(definition) {
     throw new Error('Invalid definition: definition requires a string type');
   }
 
-  const payload = definition.data ? { ...definition.data } : {};
+  const payload = freezeJsonValue(definition.data ? cloneJsonValue(definition.data) : {});
   const hash = computeDeterministicHash({ id: definition.id, type: definition.type, data: payload });
 
   return Object.freeze({
     id: definition.id,
     type: definition.type,
-    data: Object.freeze(payload),
+    data: payload,
     hash,
     compiledAt: Date.now()
   });
