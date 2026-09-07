@@ -95,6 +95,17 @@ export function createInputSystem({
   const keyMap = { ...keyboardBindings };
   const gamepadButtonMap = new Map();
   const gamepadAxisMap = new Map();
+  const scalarKeys = new Map(), scalarAxes = new Map(), scalarButtons = new Map(), simulatedValues = new Map();
+  const scalar = value => Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
+  function checkAction(action) {
+    if (!declaredActions.has(action)) throw new Error(`Undeclared scalar action: ${action}`);
+  }
+  function bindScalarDevice(map, index, action, deadzone = 0) {
+    if (!Number.isInteger(index) || index < 0) throw new Error('Invalid scalar device index');
+    if (!Number.isFinite(deadzone) || deadzone < 0 || deadzone >= 1) throw new Error('Scalar deadzone must be in [0,1)');
+    if (action === null) { map.delete(index); return; }
+    checkAction(action); map.set(index, { action, deadzone });
+  }
 
   // Populate initial gamepad button bindings (content-safe check for Proof A defaults)
   const isProofA = isDefaultProofAActions(actions);
@@ -176,6 +187,22 @@ export function createInputSystem({
   }
 
   return {
+    // Additive bindings: existing boolean threshold bindings are unchanged.
+    bindScalarKey(code, action, value = 1) {
+      if (action === null) { scalarKeys.delete(code); return; }
+      checkAction(action);
+      if (!Number.isFinite(value)) throw new Error('Scalar key value must be finite');
+      scalarKeys.set(code, { action, value: scalar(value) });
+    },
+    bindScalarAxis(index, action, { deadzone = 0.15 } = {}) {
+      bindScalarDevice(scalarAxes, index, action, deadzone);
+    },
+    bindScalarButton(index, action) { bindScalarDevice(scalarButtons, index, action); },
+    simulateActionValue(action, value) {
+      checkAction(action);
+      if (!Number.isFinite(value)) throw new Error('Simulated scalar must be finite');
+      simulatedValues.set(action, scalar(value));
+    },
     /**
      * Rebinds a keyboard code to an action.
      */
@@ -289,6 +316,7 @@ export function createInputSystem({
       }
       rawKeyStates.clear();
       simulatedActions.clear();
+      simulatedValues.clear();
       preferredGamepadIndex = null;
     },
 
@@ -424,7 +452,29 @@ export function createInputSystem({
         }
       }
 
-      const frozenActions = Object.freeze(activeState);
+      const values = Object.fromEntries([...declaredActions].map(a => [a, Number(activeState[a])]));
+      const contributions = new Map();
+      for (const [code, { action, value }] of scalarKeys) {
+        if (!rawKeyStates.get(code)) continue;
+        if (!contributions.has(action)) contributions.set(action, new Set());
+        contributions.get(action).add(value); // Alias keys do not double magnitude.
+      }
+      const merge = (action, value) => { if (Math.abs(value) > Math.abs(values[action])) values[action] = value; };
+      for (const [action, parts] of contributions) merge(action, scalar([...parts].reduce((a,b) => a+b, 0)));
+      if (pad && pad.connected !== false) {
+        for (const [index, { action, deadzone }] of scalarAxes) {
+          const value = scalar(pad.axes?.[index]);
+          merge(action, Math.abs(value) <= deadzone ? 0 : Math.sign(value)*(Math.abs(value)-deadzone)/(1-deadzone));
+        }
+        for (const [index, { action }] of scalarButtons) {
+          const button = pad.buttons?.[index];
+          merge(action, Math.max(0, scalar(typeof button === 'object' ? (button?.value ?? Number(button?.pressed)) : button)));
+        }
+      }
+      // Explicit semantic simulation overrides scalar hardware, including zero.
+      for (const [action, value] of simulatedValues) values[action] = value;
+      for (const action of declaredActions) activeState[action] ||= values[action] !== 0;
+      const frozenActions = Object.freeze(activeState), frozenValues = Object.freeze(values);
 
       return Object.freeze({
         isActionActive(action) {
@@ -432,6 +482,10 @@ export function createInputSystem({
         },
         getAllActions() {
           return frozenActions;
+        },
+        getActionValue(action) { return frozenValues[action] ?? 0; },
+        getAllActionValues() {
+          return frozenValues;
         }
       });
     },
@@ -442,6 +496,7 @@ export function createInputSystem({
     clear() {
       rawKeyStates.clear();
       simulatedActions.clear();
+      simulatedValues.clear();
       activeGamepad = null;
       preferredGamepadIndex = null;
     }

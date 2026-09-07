@@ -31,7 +31,10 @@ const isControlled = params.has('controlled');
 
 const app = document.getElementById('app');
 
-if (params.get('proof') === 'c') {
+if (params.get('proof') === 'd') {
+  const { createDViewer } = await import('./d-viewer.js');
+  createDViewer(app, { controlled: isControlled });
+} else if (params.get('proof') === 'c') {
   const { createCViewer } = await import('./c-viewer.js');
   createCViewer(app, { controlled: isControlled, seed: params.has('seed') ? Number(params.get('seed')) : undefined });
 } else if (isB2Mode) {

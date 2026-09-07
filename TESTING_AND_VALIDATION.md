@@ -587,7 +587,7 @@ The evaluation harness (`src/eval/*`) provides automated, headless real-browser 
   - Exit code `0` = PASS (all checks passed with zero fatal/error diagnostics).
   - Exit code `1` = FAIL (one or more checks failed or fatal errors encountered).
   - Executes headless real-browser validation (`puppeteer-core`).
-- **Default Suite Targets**: By default, `npm run eval` executes the full five-target evaluation suite:
+- **Default Suite Targets**: By default, `npm run eval` executes the full six-target evaluation suite:
   1. **Phase 0 Controlled Boot Proof**:
      - URL: `http://localhost:5173/?controlled=1`
      - Evaluates foundational engine boot and purity checks (`boot`, `runtimeMode`, `fullEngineSeam`, `purity`, `noConsoleErrors`, `noPageErrors`, `noFailedRequests`, `domStatusPass`).
@@ -625,12 +625,35 @@ The evaluation harness (`src/eval/*`) provides automated, headless real-browser 
      - Mesh truth uses independent triangle ray intersections. Vegetation rendering inspects actual trunk instance transforms. Grounding uses realized foot bones and skinned sole vertices over non-flat traversal, not only analytic target values.
      - Every required check must be exactly true; missing values, a missing page bridge or false page success fail the target. INFO/ERROR records and measured world/traversal metrics appear under `browserDetails.targets.c.cProof`.
      - Captures after the controlled sequence: `artifacts/captures/proof_c_world_fixture.png`. Existing targets retain their previous capture timing.
+  6. Proof D Arcade Racing Controlled Fixture:
+     - URL: `http://localhost:5173/?proof=d&controlled=1`.
+     - Project-owned Copper Loop: 128 offset samples, 256 barrier faces, eight
+       gates, two laps, fixed start and fixed camera. No Character/Motion/World
+       Forge dependency or external physics.
+     - A semantic scalar driver applies throttle, initially drives into the
+       outer barrier, then steers toward centerline lookahead samples. It never
+       teleports or writes vehicle/race state. Race authority runs at 60 Hz.
+     - Checks: `dBoot`, `dTrackGeneration`, `dVehicleMotion`, `dAnalogInput`,
+       `dBarrierCollision`, `dCheckpointProgress`, `dRaceFinish`,
+       `dControlledCamera`, `dPageProofSuccess`. All must be exactly true.
+     - Geometry samples and rendered gate frames are compared with track truth.
+       Barrier truth reads the actual instanced box face transforms. Committed
+       distance, disk containment, barrier contact, scalar snapshots, strictly
+       ordered checkpoint records and terminal race state are required.
+     - Canonical data includes normalized track definition/hash and final vehicle,
+       fixed-time and checkpoint state. It excludes generation/step timings and
+       transient Three.js identities. Compare this data and captures across runs.
+     - Report metrics include generation time, geometry counts, barrier/gate counts,
+       observed distance, clearance, controlled step timing and render draw counts.
+     - Capture: `artifacts/captures/proof_d_racing_fixture.png`, after the real race.
+       Existing five targets retain their capture timing and presentation.
 - **Capture Fixtures**:
   - `artifacts/captures/phase0_boot_fixture.png` (Phase 0 boot proof)
   - `artifacts/captures/proof_a_pong_fixture.png` (Proof A Pong game)
   - `artifacts/captures/proof_b1_motion_fixture.png` (Proof B1 Motion truth)
   - `artifacts/captures/proof_b2_combat_fixture.png` (Proof B2 Combat room)
   - `artifacts/captures/proof_c_world_fixture.png` (Proof C bounded world)
+  - `artifacts/captures/proof_d_racing_fixture.png` (Proof D arcade racer)
   - Captures record SHA-256 integrity hash, byte size, viewport dimensions (default 1280x720), format, and git revision metadata.
 - **Single-Target / Custom Evaluation**:
   - The programmatic harness (`runEvaluation({ url, captureName })`) supports single-target evaluation if a custom target URL or capture name is specified.
@@ -651,6 +674,34 @@ The evaluation harness (`src/eval/*`) provides automated, headless real-browser 
 ---
 
 ## 23. Performance Validation
+
+Proof D coverage lives in `tests/racing.test.js` and `tests/racing-browser.test.js`:
+scalar compatibility, sparse controller reconnect, deterministic track geometry,
+all inner/outer barrier segments and corner sweeps, directed ordered gates,
+acceleration/braking/steering, transform commit ownership, resets, repeatable real
+race completion, bounded camera orbit isolation, browser keyboard/gamepad paths,
+viewport/DPR, resource teardown/recreation, lazy routing and failure injection.
+The actual evaluator must fail even when every named D check is true but page
+success is false. Injected collision, movement and progression failures must also
+fail the page proof.
+
+Live `?proof=d` has a chase camera with Q/E or right-stick yaw limited to ±1.1
+radians. WASD/arrows drive; controller left stick steers, triggers drive/brake,
+R/Y restarts the whole race at the definition-derived start. Controlled mode does
+not attach live input or start a frame loop; camera input cannot alter its view.
+It injects an empty controller through the existing public input seam, preventing
+physical gamepad polling (including boolean reset) from affecting controlled runs.
+Rendering interpolates position/heading; race timing uses only fixed ticks.
+
+Proof D visual failures are: torn/self-intersecting track, visible/collision
+disagreement, unreadable steering or gate direction, camera losing the vehicle,
+camera input affecting simulation, skipped-course finishes, invalid reset
+placement, binary analog control, or presentation that remains a moving-box test.
+Builder visual observations are evidence, not independent acceptance. The current
+renderer uses the accepted WebGL2 presentation path; no new renderer framework,
+WebGPU implementation, vehicle physics, camera framework or racing subsystem is
+claimed. Live frame measurements must report raw observed intervals separately
+from simulation clock clamps.
 
 Proof C's automated contracts are in `tests/world.test.js` and
 `tests/world-browser.test.js`. They include seed variation/repeatability, recipe

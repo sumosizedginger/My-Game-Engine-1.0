@@ -100,7 +100,9 @@ export function runBrowserEvaluation({
 
       // Wait for engine module initialization based on target URL
       try {
-        if (url.includes('proof=c')) {
+        if (url.includes('proof=d')) {
+          await page.waitForFunction(() => Boolean(window.__PROOF_D_RACING__), { timeout: 6000 });
+        } else if (url.includes('proof=c')) {
           await page.waitForFunction(() => Boolean(window.__PROOF_C_WORLD__), { timeout: 6000 });
         } else if (url.includes('proof=b2')) {
           await page.waitForFunction(() => Boolean(window.__PROOF_B2_COMBAT__), { timeout: 6000 });
@@ -438,6 +440,15 @@ export function runBrowserEvaluation({
         if (captureScreenshot) screenshotBuffer = await page.screenshot({ type: 'png' });
       }
 
+      let dProof = null;
+      if (url.includes('proof=d')) {
+        dProof = await page.evaluate(async () => {
+          try { return await window.__PROOF_D_RACING__.runProof(); }
+          catch (error) { return { success: false, error: error.message, stack: error.stack }; }
+        });
+        if (captureScreenshot) screenshotBuffer = await page.screenshot({ type: 'png' });
+      }
+
       return {
         url,
         httpStatus,
@@ -446,6 +457,7 @@ export function runBrowserEvaluation({
         b1Proof,
         b2Proof,
         cProof,
+        dProof,
         domDetails,
         consoleErrors,
         consoleWarnings,

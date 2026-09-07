@@ -185,6 +185,41 @@ B2 declares combat actions: `MoveForward`, `MoveBackward`, `MoveLeft`, `MoveRigh
 
 ---
 
+### 5.6 Generic scalar actions (Proof D implementation)
+
+The additive scalar channel preserves magnitude before immutable snapshot capture.
+Existing boolean bindings, `simulateAction`, `isActionActive` and boolean values
+from `getAllActions()` remain compatible. Existing games need no migration.
+
+- `bindScalarKey(code, action, value = 1)` maps a key to a finite signed value,
+  clamped to [-1, 1]. Null action removes that scalar binding.
+- `bindScalarAxis(index, action, { deadzone = 0.15 })` preserves signed axis
+  magnitude. Deadzone must be finite in [0, 1). Inside it the value is zero;
+  outside it magnitude is `(abs(axis) - deadzone) / (1 - deadzone)`.
+- `bindScalarButton(index, action)` reads button magnitude in [0, 1], falling
+  back to `pressed` only when an object has no value. Null action unbinds either
+  scalar device binding. Undeclared actions and invalid indices are rejected.
+- Nonfinite or absent hardware values become zero; finite hardware values clamp.
+  Disconnected injected pads contribute no scalar values. Navigator discovery
+  retains the existing sparse-slot and reconnect policy.
+- Snapshot `getActionValue(action)` returns a number, or zero for unknown actions.
+  `getAllActionValues()` returns a frozen map. Boolean-only actions read as 0/1.
+  A nonzero scalar also makes the corresponding boolean action active.
+- Keyboard aliases contributing the same scalar count once. Distinct held-key
+  values sum and clamp, so opposite digital steering cancels. Sources then merge
+  by greatest absolute magnitude. Ties retain the earlier source: legacy boolean,
+  scalar keyboard, scalar axes in binding order, scalar buttons in binding order.
+- `simulateActionValue(action, value)` sets a finite, clamped scalar override,
+  including zero. Legacy boolean simulation remains an additive boolean source.
+  Scalar overrides do not suppress an independently active legacy boolean action.
+  `clear()` and `detach()` remove simulated scalar overrides.
+
+This channel is generic input substrate. Racing actions and bindings remain in
+`src/games/racing/game.js`; gameplay never reads raw controller state. Camera
+orbit uses the same semantic channel but is consumed only by project presentation.
+Coverage: legacy `tests/input.test.js`, plus `tests/racing.test.js` and
+`tests/racing-browser.test.js`.
+
 ## 6. Deterministic Collision
 
 Proof A establishes 2D Axis-Aligned Bounding Box (AABB) and arena boundary collision:

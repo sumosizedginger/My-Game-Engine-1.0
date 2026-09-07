@@ -1,0 +1,23 @@
+html.d-mode, body.d-mode { width:100%; height:100%; margin:0; overflow:hidden; display:block; }
+.d-root { position:fixed; inset:0; }
+.d-race { position:absolute; inset:0; overflow:hidden; color:#fff1d8; font:14px/1.5 system-ui,sans-serif; }
+.d-race #d-canvas { position:absolute; inset:0; }
+.d-race .d-gate-label { position:absolute; transform:translate(-50%,-50%); background:#173039df; color:#fff1d8; padding:2px 7px; font-size:10px; font-weight:800; pointer-events:none; white-space:nowrap; }
+.d-race .d-brand { position:absolute; top:24px; left:28px; font-size:28px; font-weight:900; letter-spacing:3px; color:#263b40; }
+.d-race .d-brand span { display:block; font-size:10px; letter-spacing:2px; }
+.d-race #d-progress { position:absolute; right:24px; top:28px; background:#173039e8; padding:12px 20px; border-left:4px solid #80e4cf; font-weight:700; }
+.d-race #d-message { position:absolute; top:22%; width:100%; text-align:center; color:white; font-weight:900; font-size:clamp(18px,3vw,36px); text-shadow:0 2px 10px #142831; pointer-events:none; }
+.d-race .d-bottom { position:absolute; bottom:88px; left:28px; right:28px; display:flex; justify-content:space-between; align-items:end; pointer-events:none; }
+.d-race #d-speed { font-size:52px; line-height:1; font-weight:850; text-shadow:0 2px 12px #142831; }
+.d-race #d-speed small { font-size:12px; }
+.d-race #d-time { font-size:32px; font-variant-numeric:tabular-nums; text-shadow:0 2px 12px #142831; }
+.d-race #d-controls { position:absolute; bottom:18px; left:28px; font-size:12px; background:#173039de; padding:8px 12px; border-radius:5px; }
+.d-race #d-controller { position:absolute; right:28px; bottom:28px; font-size:10px; max-width:220px; text-align:right; color:#173039; }
+@media(max-width:700px) {
+  .d-race .d-brand { top:16px;left:16px;font-size:19px; }
+  .d-race #d-progress { top:78px;right:16px;font-size:11px;padding:6px 10px; }
+  .d-race #d-controls { left:12px;right:12px;bottom:12px;font-size:10px; }
+  .d-race #d-controller { bottom:78px;right:16px;font-size:9px; }
+  .d-race .d-bottom { left:16px;right:16px;bottom:112px; }
+  .d-race #d-speed { font-size:38px; }
+}

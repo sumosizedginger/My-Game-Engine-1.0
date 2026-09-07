@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { getRevisionInfo } from './revision.js';
 import { runBrowserEvaluation } from './browser.js';
 import { cTargetChecks } from './c-checks.js';
+import { dTargetChecks } from './d-checks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -143,7 +144,8 @@ export async function runEvaluation(options = {}) {
     if (browserResult.screenshotBuffer) {
       let capName = options.captureName;
       if (!capName) {
-        if (phase0Url.includes('proof=c')) capName = 'proof_c_world_fixture';
+        if (phase0Url.includes('proof=d')) capName = 'proof_d_racing_fixture';
+        else if (phase0Url.includes('proof=c')) capName = 'proof_c_world_fixture';
         else if (phase0Url.includes('proof=b2')) capName = 'proof_b2_combat_fixture';
         else if (phase0Url.includes('proof=b1')) capName = 'proof_b1_motion_fixture';
         else if (phase0Url.includes('game=pong')) capName = 'proof_a_pong_fixture';
@@ -154,7 +156,7 @@ export async function runEvaluation(options = {}) {
 
     // Baseline checks
     const checks = {
-      boot: browserResult.httpStatus === 200 && (Boolean(browserResult.bootProof) || Boolean(browserResult.pongProof) || Boolean(browserResult.b1Proof) || Boolean(browserResult.b2Proof) || Boolean(browserResult.cProof)),
+      boot: browserResult.httpStatus === 200 && (Boolean(browserResult.bootProof) || Boolean(browserResult.pongProof) || Boolean(browserResult.b1Proof) || Boolean(browserResult.b2Proof) || Boolean(browserResult.cProof) || Boolean(browserResult.dProof)),
       runtimeMode: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.runtimeBoot) : true,
       fullEngineSeam: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.fullEngineSeam) : true,
       purity: browserResult.bootProof ? Boolean(browserResult.bootProof.checks?.purityCheck) : true,
@@ -311,6 +313,20 @@ export async function runEvaluation(options = {}) {
       rawDiagnostics.push(...(cResult.cProof?.diagnosticsRecords || []));
     }
 
+    let dResult = null;
+    if (!isCustomSingleTarget || phase0Url.includes('proof=d')) {
+      dResult = isCustomSingleTarget ? browserResult : await runBrowserEvaluation({ url: 'http://localhost:5173/?proof=d&controlled=1', viewport });
+      Object.assign(checks, dTargetChecks(dResult));
+      if (!isCustomSingleTarget) {
+        if (dResult.screenshotBuffer) captures.push(saveCapture(outputDir, 'proof_d_racing_fixture', revision.commit, viewport, dResult.screenshotBuffer));
+        allConsoleErrors.push(...dResult.consoleErrors); allPageErrors.push(...dResult.pageErrors); allFailedRequests.push(...dResult.failedRequests);
+      }
+      if (dResult.consoleErrors.length) checks.noConsoleErrors = false;
+      if (dResult.pageErrors.length) checks.noPageErrors = false;
+      if (dResult.failedRequests.length) checks.noFailedRequests = false;
+      rawDiagnostics.push(...(dResult.dProof?.diagnosticsRecords || []));
+    }
+
     const diagnostics = processDiagnostics(rawDiagnostics);
     const status = Object.values(checks).every(Boolean) && !diagnostics.hasErrors ? 'PASS' : 'FAIL';
     const durationMs = Math.round((performance.now() - startTime) * 100) / 100;
@@ -347,7 +363,7 @@ export async function runEvaluation(options = {}) {
       telemetry,
       captures,
       browserDetails: {
-        url: isCustomSingleTarget ? phase0Url : 'http://localhost:5173/ (Full Suite: Phase 0 + Proof A + Proof B1 + Proof B2 + Proof C)',
+        url: isCustomSingleTarget ? phase0Url : 'http://localhost:5173/ (Full Suite: Phase 0 + Proof A + Proof B1 + Proof B2 + Proof C + Proof D)',
         httpStatus: browserResult.httpStatus,
         dom: combinedDom,
         targets: {
@@ -370,6 +386,7 @@ export async function runEvaluation(options = {}) {
             dom: b1Result.domDetails
           } : null,
           c: cResult ? { url: cResult.url, httpStatus: cResult.httpStatus, cProof: cResult.cProof } : null,
+          d: dResult ? { url: dResult.url, httpStatus: dResult.httpStatus, dProof: dResult.dProof } : null,
           b2: b2Result ? {
             url: 'http://localhost:5173/?proof=b2&controlled=1',
             httpStatus: b2Result.httpStatus,

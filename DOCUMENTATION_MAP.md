@@ -502,6 +502,15 @@ See `docs/learn/BUILDING_A_BOUNDED_PROCEDURAL_WORLD.md` for the accepted world-g
 
 # 12. Proof D — Different Genre
 
+Implementation routing: `src/games/racing/track.js` owns the project circuit
+definition, geometry, shared barrier segments and gate frames; `game.js` owns
+kinematics and ordered race progression; `camera.js` and `renderer.js` own
+presentation. `src/browser/d-viewer.js` provides lazy live/controlled routes.
+Read `GAMEPLAY_FOUNDATION.md` §5.6 for the generic scalar input extension and
+`TESTING_AND_VALIDATION.md` §22.1 for the sixth evaluator target. Focused proof
+contracts are in `tests/racing.test.js` and `tests/racing-browser.test.js`.
+There is no Character, Motion or World Forge dependency in this game.
+
 Read:
 
 ```text
