@@ -31,7 +31,10 @@ const isControlled = params.has('controlled');
 
 const app = document.getElementById('app');
 
-if (params.get('proof') === 'd') {
+if (params.get('game') === 'sequence') {
+  const { createSequenceViewer } = await import('./sequence-viewer.js');
+  createSequenceViewer(app, { controlled: isControlled });
+} else if (params.get('proof') === 'd') {
   const { createDViewer } = await import('./d-viewer.js');
   createDViewer(app, { controlled: isControlled });
 } else if (params.get('proof') === 'c') {
