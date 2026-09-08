@@ -198,7 +198,7 @@ This onboarding sequence allowed the blind participant to construct Order Five w
 
 | Export | Path | Purpose |
 |---|---|---|
-| `@sumosizedginger/my-game-engine-1.0` | `src/runtime/index.js` | Default runtime entry point |
+| `@sumosizedginger/my-game-engine-1.0` | `src/index.js` | Default runtime entry point (re-exports `./runtime/index.js`) |
 | `@sumosizedginger/my-game-engine-1.0/runtime` | `src/runtime/index.js` | Explicit runtime entry point |
 | `@sumosizedginger/my-game-engine-1.0/full` | `src/full/index.js` | Runtime + definition compiler (`compileDefinition`) |
 
@@ -240,7 +240,7 @@ My Game Engine 1.0 enforces a clean boundary between data definitions and runtim
          │
          ▼
 2. compileDefinition() (from full/index.js)
-   └── Validates schema, stamps sha256 hash, freezes immutable artifact
+   └── Validates schema, stamps deterministic content fingerprint, freezes immutable artifact
          │
          ▼
 3. runtime.instantiate() (from runtime/index.js)
@@ -389,6 +389,7 @@ Order Five maintains two distinct tick counters:
 const phase = state.getState();
 if (phase === 'READY' && move.mag > 0) {
   state.transition('PLAYING');
+  // ... update objective
 }
 
 const playing = state.getState() === 'PLAYING';
@@ -820,7 +821,7 @@ Resisting the urge to promote every project-level helper into the core engine ke
 
 ## 17. What Friction Means: Diagnostics and Failure Classification
 
-When a blind user encounters difficulty using an engine, `ROADMAP.md` §41 classifies the friction into six distinct categories:
+When a blind user encounters difficulty using an engine, `ROADMAP.md` §44 classifies the friction into six distinct categories:
 
 ```text
 1. API Defect: Engine code produces incorrect results or throws unexpected errors.
@@ -859,7 +860,7 @@ Public documentation is not marketing material or an afterthought. For a develop
 
 Order Five is validated by 10 focused automated tests in `tests/sequence.test.js`. These tests prove that the public engine contracts hold under automated testing.
 
-The current repository contains **186 tests across 11 suites**. Order Five contributes tests 177 through 186:
+The current repository contains **186 tests across 11 suites**. Order Five contributes 10 focused tests:
 
 ```text
 tests/sequence.test.js
