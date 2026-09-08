@@ -116,6 +116,7 @@ Entry points:
 - `docs/learn/BUILDING_A_WALKING_CHARACTER.md`
 - `docs/learn/BUILDING_A_PROCEDURAL_COMBAT_ROOM.md`
 - `docs/learn/BUILDING_A_BOUNDED_PROCEDURAL_WORLD.md`
+- `docs/learn/BUILDING_A_DIFFERENT_GENRE.md`
 
 Learning documents do not override canonical architecture.
 
@@ -510,6 +511,9 @@ Read `GAMEPLAY_FOUNDATION.md` §5.6 for the generic scalar input extension and
 `TESTING_AND_VALIDATION.md` §22.1 for the sixth evaluator target. Focused proof
 contracts are in `tests/racing.test.js` and `tests/racing-browser.test.js`.
 There is no Character, Motion or World Forge dependency in this game.
+
+Learning note:
+See `docs/learn/BUILDING_A_DIFFERENT_GENRE.md` for the accepted Proof D learning extraction and architecture walkthrough.
 
 Read:
 
