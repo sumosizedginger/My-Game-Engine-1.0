@@ -87,7 +87,7 @@ export function createEntityManager() {
      * @returns {boolean} True if handle points to an active, matching entity slot.
      */
     isValid(handle) {
-      if (!handle || typeof handle.index !== 'number' || typeof handle.generation !== 'number') {
+      if (!handle || !Number.isInteger(handle.index) || !Number.isInteger(handle.generation)) {
         return false;
       }
       if (handle.index < 0 || handle.index >= slots.length) {
@@ -154,11 +154,17 @@ export function createEntityManager() {
     },
 
     /**
-     * Resets the entire entity pool.
+     * Clears entity data while preserving slot generations for safe reuse.
      */
     clear() {
-      slots.length = 0;
       freeIndices.length = 0;
+      for (let index = 0; index < slots.length; index++) {
+        const slot = slots[index];
+        if (slot.active) slot.generation++;
+        slot.active = false;
+        slot.data = null;
+        freeIndices.push(index);
+      }
       liveCount = 0;
     }
   };
