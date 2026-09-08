@@ -3,6 +3,113 @@ import assert from 'node:assert/strict';
 
 import { createInputSystem, selectActiveGamepad } from '../src/runtime/input.js';
 
+function createLifecycleInput() {
+  const input = createInputSystem({ actions: ['Up', 'Down', 'Fire', 'Steer', 'Throttle'], keyboardBindings: { KeyW: 'Up' } });
+  input.bindGamepadAxis(1, 'Up', 'Down');
+  input.bindGamepadButton(0, 'Fire');
+  input.bindScalarAxis(0, 'Steer', { deadzone: 0 });
+  input.bindScalarButton(1, 'Throttle');
+  return input;
+}
+
+test('disconnected injected pads release boolean/scalar input and diagnostics across replacement', () => {
+  const input = createLifecycleInput();
+  const pad = { connected: false, axes: [0.75, -1], buttons: [{ pressed: true, value: 1 }, { pressed: true, value: 0.6 }] };
+  const zero = { Up: 0, Down: 0, Fire: 0, Steer: 0, Throttle: 0 };
+  input.setGamepad(pad);
+  for (let cycle = 0; cycle < 3; cycle++) {
+    for (let snapshot = 0; snapshot < 3; snapshot++) {
+      const state = input.captureSnapshot();
+      assert.deepEqual(state.getAllActionValues(), zero);
+      assert.ok(Object.values(state.getAllActions()).every(value => value === false));
+      const status = input.getGamepadStatus();
+      assert.equal(status.source, 'injected');
+      assert.equal(status.detected, false);
+      assert.equal(status.connected, false);
+      assert.deepEqual(status.activeActions, []);
+    }
+    // Reconnect the same object, then replace it with a disconnected object.
+    pad.connected = true;
+    input.setGamepad(pad);
+    const held = input.captureSnapshot();
+    assert.deepEqual(held.getAllActionValues(), { Up: 1, Down: 0, Fire: 1, Steer: 0.75, Throttle: 0.6 });
+    assert.equal(input.getGamepadStatus().connected, true);
+    assert.deepEqual(input.getGamepadStatus().activeActions, ['Fire', 'Up']);
+    pad.connected = false;
+    assert.deepEqual(input.captureSnapshot().getAllActionValues(), zero);
+    input.setGamepad({ ...pad, connected: true });
+    assert.equal(input.captureSnapshot().isActionActive('Up'), true);
+    input.setGamepad({ ...pad, connected: false });
+    assert.deepEqual(input.captureSnapshot().getAllActionValues(), zero);
+    assert.equal(held.getActionValue('Steer'), 0.75);
+    assert.ok(Object.isFrozen(held) && Object.isFrozen(held.getAllActions()) && Object.isFrozen(held.getAllActionValues()));
+  }
+  input.setGamepad({ ...pad, connected: true });
+  input.clear(); input.clear();
+  assert.deepEqual(input.captureSnapshot().getAllActionValues(), zero);
+  assert.equal(input.getGamepadStatus().source, 'navigator');
+});
+
+test('disconnected injection preserves keyboard/simulation and repeated attach/detach cleanup', () => {
+  const input = createLifecycleInput(), target = new EventTarget();
+  input.setGamepad({ connected: false, axes: [1, -1], buttons: [{ pressed: true }] });
+  for (let cycle = 0; cycle < 3; cycle++) {
+    input.attach(target); input.attach(target);
+    const key = new Event('keydown'); Object.defineProperty(key, 'code', { value: 'KeyW' });
+    target.dispatchEvent(key);
+    input.simulateAction('Fire', true);
+    input.simulateActionValue('Steer', -0.4);
+    const snapshot = input.captureSnapshot();
+    assert.deepEqual(snapshot.getAllActionValues(), { Up: 1, Down: 0, Fire: 1, Steer: -0.4, Throttle: 0 });
+    input.detach(target); input.detach(target);
+    target.dispatchEvent(key);
+    assert.ok(Object.values(input.captureSnapshot().getAllActionValues()).every(value => value === 0));
+    assert.equal(snapshot.isActionActive('Up'), true);
+    assert.equal(snapshot.getActionValue('Steer'), -0.4);
+  }
+});
+
+test('disconnected injection blocks navigator fallback until null/clear releases authority', () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const target = new EventTarget(), input = createLifecycleInput();
+  let polls = 0;
+  const pad1 = { index: 1, connected: true, axes: [0, -1], buttons: [] };
+  const pad2 = { index: 2, connected: true, axes: [0, 1], buttons: [] };
+  let pads = [null, pad1, pad2];
+  try {
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { getGamepads: () => { polls++; return pads; } } });
+    input.setGamepad({ connected: false, axes: [1, -1], buttons: [{ pressed: true }] });
+    assert.equal(input.captureSnapshot().isActionActive('Up'), false);
+    assert.deepEqual(input.getGamepadStatus().activeActions, []);
+    assert.equal(polls, 0);
+    input.setGamepad(null);
+    assert.equal(input.captureSnapshot().isActionActive('Up'), true);
+    assert.equal(input.getGamepadStatus().index, 1);
+    pad1.connected = false;
+    assert.equal(input.captureSnapshot().isActionActive('Down'), true);
+    assert.equal(input.getGamepadStatus().index, 2);
+    pad1.connected = true;
+    assert.equal(input.getGamepadStatus().index, 2, 'connected preferred pad remains selected');
+    input.attach(target);
+    const disconnected = new Event('gamepaddisconnected'); Object.defineProperty(disconnected, 'gamepad', { value: pad2 });
+    pad2.connected = false; target.dispatchEvent(disconnected);
+    assert.equal(input.getGamepadStatus().index, 1);
+    pads = [null, null, pad2];
+    assert.equal(input.getGamepadStatus().detected, false);
+    pad2.connected = true;
+    const connected = new Event('gamepadconnected'); Object.defineProperty(connected, 'gamepad', { value: pad2 });
+    target.dispatchEvent(connected);
+    assert.equal(input.getGamepadStatus().index, 2);
+    input.setGamepad({ connected: false, axes: [], buttons: [] });
+    input.clear();
+    assert.equal(input.captureSnapshot().isActionActive('Down'), true, 'clear restores navigator discovery');
+  } finally {
+    input.detach(target);
+    if (descriptor) Object.defineProperty(globalThis, 'navigator', descriptor);
+    else delete globalThis.navigator;
+  }
+});
+
 test('input system: maps keyboard keys to semantic actions', () => {
   const input = createInputSystem();
 

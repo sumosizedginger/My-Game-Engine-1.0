@@ -144,7 +144,8 @@ export function createInputSystem({
 
   function getLiveGamepad() {
     if (activeGamepad) {
-      return activeGamepad;
+      // Keep injected authority until explicitly released, but ignore disconnected devices.
+      return activeGamepad.connected === false ? null : activeGamepad;
     }
     if (typeof navigator !== 'undefined' && typeof navigator.getGamepads === 'function') {
       let rawPads;
