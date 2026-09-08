@@ -176,7 +176,16 @@ export function createRacingInput() {
 }
 ```
 
-The game simulation updates solely by querying `input.getActionValue('Throttle')` or `input.getActionValue('Steer')`.
+Gameplay captures input once at the start of each fixed simulation step, then queries that snapshot:
+
+```javascript
+const snapshot = input.captureSnapshot();
+const throttle = Math.max(0, snapshot.getActionValue('Throttle'));
+const brake = Math.max(0, snapshot.getActionValue('Brake'));
+const steer = snapshot.getActionValue('Steer');
+```
+
+In `ArcadeRace.update()`, the source names this local snapshot `input` and obtains it from `this.input.captureSnapshot()`. The example above names it `snapshot` to distinguish it from the input manager. Scalar and boolean action values are frozen into the per-step snapshot, which gameplay consumes throughout that simulation step. `getActionValue`, `getAllActionValues`, `isActionActive`, and `getAllActions` belong to the captured snapshot. Bindings and snapshot capture remain input-manager operations.
 
 ---
 

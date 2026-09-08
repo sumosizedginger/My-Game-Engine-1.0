@@ -285,11 +285,14 @@ DO transitionState('GAME_OVER')
 Proof A establishes the legitimate definition-to-artifact compile seam:
 
 1. **Definition**: `PongArenaDefinition`, `PaddlePrefabDefinition`, `BallPrefabDefinition` (declarative objects defining dimensions, speeds, colors, and capabilities).
-2. **Compiler Step**: `compileDefinition(definition)` validates required fields, computes a deterministic pure-JS content fingerprint, and emits a frozen `Artifact`.
-   - **Non-Cryptographic Fingerprint**: The current implementation computes a fast, deterministic pure-JS content fingerprint (~48-bit hex string). It is **not** SHA-256 and is **non-cryptographic**. It provides deterministic content identity within current Proof A scope without introducing browser async `crypto.subtle` requirements or Node-specific dependencies into the synchronous compiler seam.
+2. **Compiler Step**: `compileDefinition(definition)` validates required fields, recursively copies and freezes JSON-compatible configuration data, normalizes omitted data to an empty object, computes a deterministic pure-JS content fingerprint, and emits a frozen `Artifact`.
+   - **Non-Cryptographic Fingerprint**: The current implementation computes a fast, deterministic pure-JS hexadecimal content fingerprint. It is **not** SHA-256 and is **non-cryptographic**. It provides deterministic content identity within current Proof A scope without introducing browser async `crypto.subtle` requirements or Node-specific dependencies into the synchronous compiler seam.
    - **Metadata Separation**: The `compiledAt` timestamp is runtime compile metadata and is explicitly excluded from the deterministic content fingerprint, preserving stable identity across identical definition compilations.
    - **Cryptographic Provenance**: Cryptographic artifact provenance and integrity hashing (e.g. SHA-256) is **future work** and should only be introduced when a later proof or export distribution workflow actually requires it.
-3. **Instantiate Step**: `runtime.instantiate(artifact)` creates runtime entities and attaches transform/renderable state.
+3. Instantiate Step: `runtime.instantiate(artifact, context)` currently returns a transient runtime instance record with `instanceId`, `artifactId`, `type`, `data`, `instantiatedAt`, and `context`. For compiled configuration objects, `data` references `artifact.data`; the optional context defaults to an empty object. This operation does not automatically spawn an entity, register a transform, attach renderable state, or realize game-specific components.
+4. Explicit Gameplay Realization: Proof A separately calls `entityManager.spawn(...)` with fields derived from `artifact.data`, then `transformManager.setTransform(handle, ...)` with position, velocity, and ownership. Rendering remains project-specific. See [Building a Tiny Game, section 3](docs/learn/BUILDING_A_TINY_GAME.md#3-definition--artifact--instantiate) for the construction sequence.
+
+These separate operations preserve Definition / Artifact / Runtime separation. They describe the accepted minimal seam, not a final universal prefab or component-instantiation architecture.
 
 Purity invariant: `compileDefinition` is isolated to the full/authoring seam and does not pollute `engine/runtime`.
 

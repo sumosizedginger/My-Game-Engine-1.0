@@ -78,12 +78,18 @@ My-Game-Engine-1.0/
 A core law of My Game Engine 1.0 ([`CONSTITUTION.md`](../../CONSTITUTION.md) §3 and [`ARCHITECTURE.md`](../../ARCHITECTURE.md) §5) is the strict separation of asset phases:
 
 ```text
-Definition (Source) ──[ compileDefinition ]──> Artifact (Immutable) ──[ runtime.instantiate ]──> Runtime Object (Transient)
+Definition (Source)
+  -> compileDefinition()
+  -> Artifact (Immutable)
+  -> runtime.instantiate()
+  -> Runtime Instance Record (Transient)
 ```
 
 - **Definition**: Plain, serializable JavaScript objects defining properties, dimensions, speeds, and rules. Definitions are the source of truth.
 - **Artifact**: The immutable product of compilation. Contains validated configuration, compile metadata, and a deterministic content fingerprint.
-- **Runtime Object**: Transient runtime entities and components created when an artifact is instantiated into the active simulation.
+- Runtime Instance Record: A transient record returned by `runtime.instantiate(artifact, context)`, referencing the compiled configuration. It is separate from an entity handle, transform, or renderable.
+
+Gameplay realization is explicit in project code: after compilation and runtime-record creation, Proof A calls `entityManager.spawn(...)` and `transformManager.setTransform(...)`. Its game renderer presents the resulting entities. Instantiation does not automatically perform these operations or attach arbitrary components.
 
 ### 3.1 Defining Game Objects
 In [`src/games/pong/definitions.js`](../../src/games/pong/definitions.js), the court and actors are expressed as plain, frozen definitions:
@@ -121,34 +127,75 @@ export function compileDefinition(definition) {
     throw new Error('Invalid definition: definition requires a string type');
   }
 
-  const payload = definition.data ? { ...definition.data } : {};
+  const payload = freezeJsonValue(definition.data ? cloneJsonValue(definition.data) : {});
   const hash = computeDeterministicHash({ id: definition.id, type: definition.type, data: payload });
 
   return Object.freeze({
     id: definition.id,
     type: definition.type,
-    data: Object.freeze(payload),
+    data: payload,
     hash,
     compiledAt: Date.now()
   });
 }
 ```
 
+This excerpt matches the accepted `compileDefinition` function. Its local helpers are defined in the linked source; they are not additional public APIs. For JSON-compatible configuration data:
+
+- `cloneJsonValue` recursively copies nested objects and arrays into an independent graph. Mutating caller-owned nested data after compilation cannot mutate `artifact.data`.
+- `freezeJsonValue` recursively freezes that copied graph. The artifact record itself is also frozen.
+- Array element order is preserved. `serializeJsonValue`, used by the fingerprint helper, sorts object keys at every depth, so object-key insertion order does not affect the fingerprint. This sorting applies to serialization; it does not reorder the stored configuration.
+- Omitting `definition.data` and providing an empty object both normalize to `{}` and produce the same fingerprint for the same `id` and `type`.
+- The fingerprint input is the normalized `{ id, type, data }` content. `compiledAt` is metadata outside that input.
+
+These guarantees cover JSON-compatible data, not arbitrary class instances, functions, cyclic graphs, or other unsupported values.
+
 > [!IMPORTANT]
 > **Artifact Content Fingerprint Contract**:
-> The `hash` emitted by `compileDefinition` is a fast, deterministic, **pure-JavaScript non-cryptographic content fingerprint** (~48-bit hex string). It is **not** SHA-256. 
+> The `hash` emitted by `compileDefinition` is a fast, deterministic, **pure-JavaScript non-cryptographic hexadecimal content fingerprint**. It is **not** SHA-256.
 > - It ensures synchronous, browser-compatible content identity without requiring asynchronous WebCrypto (`crypto.subtle`) or Node-specific crypto modules.
 > - The `compiledAt` timestamp is runtime compilation metadata and is **explicitly excluded** from the deterministic content fingerprint, preserving identical hashes across recompilations of unchanged definitions.
 > - Cryptographic artifact provenance is deferred to future distribution pipelines.
 
 ### 3.3 Runtime Instantiation
-In [`src/games/pong/game.js`](../../src/games/pong/game.js), the compiled artifact is instantiated into the runtime:
+The current [`runtime.instantiate`](../../src/runtime/index.js) returns a record containing `instanceId`, `artifactId`, `type`, `data`, `instantiatedAt`, and `context`. For the compiled paddle configuration, `instance.data` references `artifact.data`. The optional context defaults to `{}`. This record does not spawn an entity, register a transform, or attach a renderable.
+
+The following compact construction walkthrough follows [`src/games/pong/game.js`](../../src/games/pong/game.js). It uses the `PLAYER_PADDLE_DEFINITION` from section 3.1 and the public package exports. The local names are shortened, and the returned instance record is retained for inspection here; Proof A calls `runtime.instantiate` without retaining that return value.
 
 ```javascript
-// Excerpt from src/games/pong/game.js
-const playerArtifact = compileDefinition(PLAYER_PADDLE_DEFINITION);
-runtime.instantiate(playerArtifact);
+import {
+  createRuntime,
+  createEntityManager,
+  createTransformManager,
+  TRANSFORM_OWNERSHIP
+} from '@sumosizedginger/my-game-engine-1.0/runtime';
+import { compileDefinition } from '@sumosizedginger/my-game-engine-1.0/full';
+
+const runtime = createRuntime({ game: 'pong' });
+const entityManager = createEntityManager();
+const transformManager = createTransformManager(entityManager);
+
+const artifact = compileDefinition(PLAYER_PADDLE_DEFINITION);
+const instance = runtime.instantiate(artifact);
+
+const handle = entityManager.spawn({
+  name: 'PlayerPaddle',
+  role: artifact.data.role,
+  halfWidth: artifact.data.halfWidth,
+  halfHeight: artifact.data.halfHeight,
+  speed: artifact.data.speed,
+  color: artifact.data.color
+});
+transformManager.setTransform(handle, {
+  position: { x: artifact.data.initialX, y: artifact.data.initialY, z: 0 },
+  velocity: { x: 0, y: 0, z: 0 },
+  ownership: TRANSFORM_OWNERSHIP.KINEMATIC
+});
 ```
+
+`artifact.data` supplies the compiled configuration. `instance` is the transient runtime record. `handle` is the generational identity returned by the explicit spawn, and transform registration associates position, velocity, and ownership with that handle. The game renderer separately reads entity data and transforms; rendering remains project/game-specific.
+
+This is the accepted minimal construction pattern, not a universal component-realization helper. The example constructs one paddle; the remaining sections explain the simulation, input, rules, and rendering that make Pong playable.
 
 ---
 

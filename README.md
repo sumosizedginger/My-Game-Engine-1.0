@@ -16,36 +16,72 @@ The engine therefore treats definitions as source, compiled artifacts as build p
 
 ```text
 Definition
-  -> validate
-  -> Kiln.compile()
-  -> compiled artifact
-  -> cache/build output
-  -> runtime instantiate
-  -> game
+  -> compileDefinition()
+  -> immutable artifact
+  -> runtime.instantiate()
+  -> transient runtime instance record
 ```
+
+Gameplay realization is explicit: project code uses compiled configuration to spawn entities, register transforms, and render the game. The current minimal instantiation seam returns a record; it does not perform those steps automatically.
 
 A native engine artifact should be constructible, inspectable, modifiable, serializable, reproducible, testable, and attributable to the definition/parameters/seed that produced it.
 
 ## Current Status
 
-The canonical repository starts empty and is bootstrapped in **Phase 0 — Repository Foundation**.
+Accepted implementation now includes:
 
-At bootstrap, do not assume that any future subsystem already exists. Names such as Geometry Forge, Character Forge, Motion Forge, Material Forge, World Forge, and Kiln describe approved architecture. They become implementation truth only after code, tests, runtime evidence, audit, and acceptance establish them.
+- Phase 0: repository and runtime foundation.
+- A0: evaluation harness.
+- Proof A: Pong, a tiny complete game.
+- Proof B1: Motion Truth.
+- Proof B2: Procedural Combat Room.
+- Proof C: Bounded Procedural World.
+- Proof D: Different Genre, a bounded 3D arcade racer.
 
-The current proof sequence is:
-
-```text
-Phase 0 — Repository Foundation
-  -> A0 — Evaluation Harness
-  -> A — Tiny Complete Game
-  -> B1 — Motion Truth
-  -> B2 — Procedural Combat Room
-  -> C — Bounded Procedural World
-  -> D — Different Genre
-  -> E — Blind API Test
-```
+Proof E is active: blind public-API usability and generality testing. It has not yet passed. Approved future architecture remains distinct from implemented public behavior.
 
 Proofs pull architecture. We do not build the entire engine first and hope a game eventually fits it.
+
+## Quick Start
+
+Use Node 24.20.0. From this repository's root, run:
+
+```bash
+npm ci
+npm test
+npm run eval
+npm run build
+npm run dev
+```
+
+These commands install dependencies, run the test suite and six-target browser evaluator, build static output in `dist/`, and start the development server. Open [Pong](http://localhost:5173/?game=pong) to play the first complete game, or the [arcade racer](http://localhost:5173/?proof=d) for the 3D example. See the [learning index](docs/learn/README.md) for all documented game routes.
+
+### Public Package Surfaces
+
+The export contracts in [package.json](package.json) are:
+
+| Import name | Current surface |
+| --- | --- |
+| `@sumosizedginger/my-game-engine-1.0` | Defaults to the runtime exports for ordinary game consumption. |
+| `@sumosizedginger/my-game-engine-1.0/runtime` | Runtime and Gameplay Foundation primitives, without the definition compiler. |
+| `@sumosizedginger/my-game-engine-1.0/full` | Runtime exports plus the accepted authoring/compiler seam: `compileDefinition` and `createEngineFull`. |
+
+For example, project code in this repository can import:
+
+```javascript
+import { createRuntime, createEntityManager, createTransformManager }
+  from '@sumosizedginger/my-game-engine-1.0/runtime';
+import { compileDefinition }
+  from '@sumosizedginger/my-game-engine-1.0/full';
+```
+
+These names describe package exports, not npm publication status. The current `/full` export does not re-export every generation subsystem; use the relevant public lesson for the implemented generation APIs.
+
+### Build Your First Game
+
+1. Follow [Building a Tiny Game](docs/learn/BUILDING_A_TINY_GAME.md), starting with section 3's explicit definition, artifact, runtime-record, entity, and transform construction.
+2. Consult [Gameplay Foundation](GAMEPLAY_FOUNDATION.md) for the entity, transform, fixed-step, input, and state contracts used by that game.
+3. Continue with [Building a Different Genre](docs/learn/BUILDING_A_DIFFERENT_GENRE.md) for scalar keyboard/controller input and the bounded 3D example.
 
 ## Repository Truth
 
@@ -97,13 +133,13 @@ A tiny exported game should not ship the entire authoring/compiler toolchain by 
 
 ## Toolchain
 
-Unless a concrete incompatibility is proven during bootstrap, pin:
+The required toolchain version is:
 
 ```text
 Node 24.20.0
 ```
 
-Phase 0 must establish documented commands for install, build, test, and browser/dev-server boot. Until Phase 0 is accepted, do not invent commands in documentation and pretend they work.
+Use the commands in [Quick Start](#quick-start) to install, validate, build, and run the current repository.
 
 ## Documentation System
 
@@ -213,7 +249,9 @@ Do not:
 
 ## Start Here
 
-Humans: read this file, then `CONSTITUTION.md`, `PRD.md`, and the current section of `ROADMAP.md`.
+Game developers: start with [Quick Start](#quick-start) and [Build Your First Game](#build-your-first-game).
+
+Product and architecture background: read `CONSTITUTION.md`, `PRD.md`, and the current section of `ROADMAP.md` as needed.
 
 Coding/audit agents: read `AGENTS.md`, then use `DOCUMENTATION_MAP.md` to load task-specific authority.
 
