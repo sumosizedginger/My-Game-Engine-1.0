@@ -4,6 +4,112 @@ import assert from 'node:assert/strict';
 import { createStateManager } from '../src/runtime/state.js';
 import { createRuleEngine } from '../src/runtime/rules.js';
 
+test('state reset rejects undeclared targets without changing state, variables or notifications', () => {
+  const state = createStateManager({ initialState: 'A', validStates: ['A', 'B'], initialVars: { score: 1 } });
+  state.transition('B');
+  state.setVar('extra', 2);
+  const calls = [];
+  state.onStateChange(() => calls.push('state'));
+  state.onVarChange('score', () => calls.push('score'));
+  for (let i = 0; i < 3; i++) {
+    assert.throws(() => state.reset('INVALID', { score: 99 }), /Invalid state reset.*undeclared state/);
+    assert.equal(state.getState(), 'B');
+    assert.deepEqual(state.getAllVars(), { score: 1, extra: 2 });
+    assert.deepEqual(calls, []);
+  }
+  state.reset('A', { score: 3 });
+  assert.equal(state.getState(), 'A');
+  assert.deepEqual(state.getAllVars(), { score: 3 });
+  assert.deepEqual(calls, []);
+  assert.equal(state.transition('B'), true);
+  assert.deepEqual(calls, ['state']);
+});
+
+test('default and repeated resets preserve initial state and variables without notification', () => {
+  for (const config of [undefined, { initialState: 'A', validStates: ['A', 'B'], initialVars: { score: 1 } }]) {
+    const state = createStateManager(config);
+    const initial = state.getState(), vars = state.getAllVars();
+    state.transition(config ? 'B' : 'PLAYING');
+    state.setVar('extra', 99);
+    const notifications = [];
+    state.onStateChange(() => notifications.push('state'));
+    state.onVarChange('extra', () => notifications.push('variable'));
+    for (let i = 0; i < 3; i++) {
+      state.reset();
+      assert.equal(state.getState(), initial);
+      assert.deepEqual(state.getAllVars(), vars);
+      assert.deepEqual(notifications, []);
+    }
+  }
+});
+
+test('state listener self-unsubscribe preserves later listeners and subsequent transitions', () => {
+  const state = createStateManager({ initialState: 'A', validStates: ['A', 'B'] });
+  const seen = [];
+  const off = state.onStateChange(() => { seen.push('first'); off(); });
+  state.onStateChange((next, previous) => seen.push([next, previous]));
+  state.onStateChange(() => seen.push('third'));
+  state.transition('B');
+  assert.deepEqual(seen, ['first', ['B', 'A'], 'third']);
+  off(); off();
+  state.transition('A');
+  assert.deepEqual(seen, ['first', ['B', 'A'], 'third', ['A', 'B'], 'third']);
+  assert.equal(state.transition('A'), false);
+  assert.equal(seen.length, 5);
+});
+
+test('state dispatch snapshots eligibility: removals and additions apply next notification', () => {
+  const state = createStateManager({ initialState: 'A', validStates: ['A', 'B'] });
+  const seen = [];
+  let added = false;
+  state.onStateChange(() => {
+    seen.push('first');
+    offSecond();
+    if (!added) { added = true; state.onStateChange(() => seen.push('new')); }
+  });
+  const offSecond = state.onStateChange(() => seen.push('second'));
+  state.onStateChange(() => seen.push('third'));
+  state.transition('B');
+  assert.deepEqual(seen, ['first', 'second', 'third']);
+  seen.length = 0;
+  state.transition('A');
+  assert.deepEqual(seen, ['first', 'third', 'new']);
+});
+
+test('state unsubscribe is idempotent even when the same callback has another registration', () => {
+  const state = createStateManager({ initialState: 'A', validStates: ['A', 'B'] });
+  let calls = 0;
+  const callback = () => calls++;
+  const first = state.onStateChange(callback), second = state.onStateChange(callback);
+  first(); first();
+  state.transition('B');
+  assert.equal(calls, 1);
+  second(); second();
+  state.transition('A');
+  assert.equal(calls, 1);
+  const order = [];
+  const shared = () => order.push('shared');
+  state.onStateChange(shared);
+  state.onStateChange(() => order.push('middle'));
+  const last = state.onStateChange(shared);
+  last(); last();
+  state.transition('B');
+  assert.deepEqual(order, ['shared', 'middle']);
+});
+
+test('state listener errors retain existing reporting and do not stop later listeners', t => {
+  const errors = [];
+  t.mock.method(console, 'error', (...args) => errors.push(args));
+  const state = createStateManager({ initialState: 'A', validStates: ['A', 'B'] });
+  const failure = new Error('listener failure');
+  let later = 0;
+  state.onStateChange(() => { throw failure; });
+  state.onStateChange(() => later++);
+  assert.equal(state.transition('B'), true);
+  assert.equal(later, 1);
+  assert.deepEqual(errors, [['[StateManager] State listener error:', failure]]);
+});
+
 test('state manager: handles state transitions and rejection of invalid states', () => {
   const sm = createStateManager({
     initialState: 'SERVE',

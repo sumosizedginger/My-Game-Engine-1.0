@@ -52,7 +52,7 @@ export function createStateManager({
       const previousState = currentState;
       currentState = nextState;
 
-      for (const listener of stateListeners) {
+      for (const listener of [...stateListeners]) {
         try {
           listener(currentState, previousState);
         } catch (e) {
@@ -63,12 +63,17 @@ export function createStateManager({
     },
 
     /**
-     * Subscribes to state changes.
+     * Subscribes to state changes in registration order. Each notification uses
+     * a snapshot: additions and removals affect subsequent notifications only.
      */
     onStateChange(fn) {
-      stateListeners.push(fn);
+      const listener = (next, previous) => fn(next, previous);
+      stateListeners.push(listener);
+      let subscribed = true;
       return () => {
-        const idx = stateListeners.indexOf(fn);
+        if (!subscribed) return;
+        subscribed = false;
+        const idx = stateListeners.indexOf(listener);
         if (idx !== -1) stateListeners.splice(idx, 1);
       };
     },
@@ -134,9 +139,13 @@ export function createStateManager({
     },
 
     /**
-     * Resets state and variables.
+     * Resets state and variables without notifying listeners.
+     * An undeclared target throws before state or variables change.
      */
     reset(state = initialState, newVars = initialVars) {
+      if (!stateSet.has(state)) {
+        throw new Error(`Invalid state reset to undeclared state: "${state}"`);
+      }
       currentState = state;
       vars.clear();
       for (const [k, v] of Object.entries(newVars)) {
