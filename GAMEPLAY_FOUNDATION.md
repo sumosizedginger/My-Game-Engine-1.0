@@ -300,7 +300,7 @@ The game state machine operates across explicit phases:
 > New games should always explicitly provide `initialState` and `validStates` matching their own game loop. For example:
 > - Combat room: `initialState: 'READY'`, `validStates: ['READY', 'ENGAGED', 'VICTORY', 'DEFEAT']`
 > - Arcade racer: `initialState: 'READY'`, `validStates: ['READY', 'COUNTDOWN', 'RACING', 'FINISHED']`
-> - Collection puzzle: `initialState: 'TITLE'`, `validStates: ['TITLE', 'PLAYING', 'VICTORY', 'GAMEOVER']`
+> - Collection puzzle: `initialState: 'READY'`, `validStates: ['READY', 'PLAYING', 'COMPLETE']`
 
 ### 7.3 Declarative Rules Engine
 
