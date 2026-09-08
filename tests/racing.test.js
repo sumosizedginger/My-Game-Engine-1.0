@@ -95,10 +95,28 @@ test('vehicle accelerates, brakes, steers and commits through one existing trans
   let commits=0;const commit=game.transforms.commitAll;game.transforms.commitAll=function(dt){commits++;return commit.call(this,dt);};
   for(let i=0;i<40;i++)game.update();assert.equal(commits,40);assert.ok(game.speed>5);
   const speed=game.speed,heading=game.heading;game.input.simulateActionValue('Throttle',0);game.input.simulateActionValue('Brake',1);game.input.simulateActionValue('Steer',0.5);
-  for(let i=0;i<8;i++)game.update();assert.ok(game.speed<speed);assert.ok(game.heading>heading);
+  for(let i=0;i<8;i++)game.update();assert.ok(game.speed<speed);assert.ok(game.heading<heading);
   assert.equal(game.transform.ownership,'KINEMATIC');assert.ok(game.transform.position.z>game.track.spawn.z);
   game.reset();assert.equal(game.speed,0);assert.equal(game.raceTicks,0);assert.equal(game.race.next,1);assert.deepEqual(game.transform.position,game.transform.previousPosition);
   assert.deepEqual(game.transform.velocity,{x:0,y:0,z:0});game.dispose();assert.equal(game.entities.isValid(game.handle),false);assert.throws(()=>game.update());
+});
+
+test('keyboard and analog controller steer toward vehicle-relative left/right, including reverse',()=>{
+  for(const [device,value] of [['KeyA',-1],['ArrowLeft',-1],['KeyD',1],['ArrowRight',1],['pad',-0.575],['pad',0.575]]) {
+    for(const speed of [8,-4]) {
+      const game=new ArcadeRace();game.state.transition('COUNTDOWN');game.state.transition('RACING');game.speed=speed;
+      if(device==='pad')game.input.setGamepad({connected:true,axes:[value],buttons:[]});
+      else game.input.handleKeyDown({code:device});
+      const before={...game.transform.position},heading=game.heading;
+      // Vehicle-right = forward cross world-up, independently of yaw integration.
+      const right={x:-Math.cos(heading),z:Math.sin(heading)};
+      game.update();
+      const after=game.transform.position,lateral=(after.x-before.x)*right.x+(after.z-before.z)*right.z;
+      assert.ok(lateral*Math.sign(value)>0,`${device} ${value}, speed ${speed}: lateral ${lateral}`);
+      assert.ok((game.heading-heading)*Math.sign(value)*Math.sign(speed)<0);
+      game.dispose();
+    }
+  }
 });
 
 test('controlled driving repeats exact state with real collision and ordered two-lap finish; reset restarts',()=>{

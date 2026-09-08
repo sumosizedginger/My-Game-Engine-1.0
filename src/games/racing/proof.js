@@ -7,7 +7,7 @@ export function controlledInput(game) {
   if(game.raceTicks<135)return {Throttle:0.9,Brake:0,Steer:0}; // Deliberate outer-barrier impact.
   const p=game.transform.position,index=game.track.nearestSample(p),target=game.track.samples[(index+5)%game.track.samples.length];
   const error=angleDelta(Math.atan2(target.x-p.x,target.z-p.z),game.heading);
-  return {Throttle:game.speed<18?0.85:0.3,Brake:game.speed>20?0.2:0,Steer:Math.max(-1,Math.min(1,error*2.4))};
+  return {Throttle:game.speed<18?0.85:0.3,Brake:game.speed>20?0.2:0,Steer:Math.max(-1,Math.min(1,-error*2.4))};
 }
 export function driveControlledRace(game,onStep=()=>{}) {
   let minClearance=Infinity,contained=true,analogThrottle=false,analogSteer=false,observedDistance=0;const times=[];

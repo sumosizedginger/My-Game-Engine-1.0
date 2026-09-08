@@ -48,7 +48,9 @@ export class ArcadeRace {
     const acceleration=throttle*VEHICLE.acceleration-brake*(this.speed>0?VEHICLE.braking:VEHICLE.acceleration*0.6);
     this.speed=Math.max(-VEHICLE.reverseSpeed,Math.min(VEHICLE.maxSpeed,(this.speed+acceleration*dt)/(1+VEHICLE.drag*dt)));
     if(Math.abs(this.speed)<0.01&&!throttle&&!brake)this.speed=0;
-    const turn=steer*1.6*Math.min(1,Math.abs(this.speed)/5)*Math.sign(this.speed)*dt;
+    // Positive semantic steering means right. With +Z forward and +Y up,
+    // vehicle-right is -X at heading zero, so right steering decreases yaw.
+    const turn=-steer*1.6*Math.min(1,Math.abs(this.speed)/5)*Math.sign(this.speed)*dt;
     this.heading+=turn;this.headingTravel+=Math.abs(turn);
     const p=this.transform.position,from={x:p.x,z:p.z};
     const next=this.track.resolveMovement(from,{x:p.x+Math.sin(this.heading)*this.speed*dt,z:p.z+Math.cos(this.heading)*this.speed*dt},VEHICLE.radius);

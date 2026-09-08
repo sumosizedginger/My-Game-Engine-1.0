@@ -27,7 +27,7 @@ test('Proof D browser play, camera, controller, lifecycle and fail-closed evalua
     await t.test('real keyboard starts countdown, accelerates, steers, brakes, orbits and resets',async()=>{
       await page.keyboard.down('w');await page.waitForFunction(()=>window.__PROOF_D_RACING__.game.speed>5,{timeout:15000});
       const heading=await page.evaluate(()=>window.__PROOF_D_RACING__.game.heading);
-      await page.keyboard.down('a');await page.waitForFunction(h=>window.__PROOF_D_RACING__.game.heading<h-0.15,{},heading);await page.keyboard.up('a');await page.keyboard.up('w');
+      await page.keyboard.down('a');await page.waitForFunction(h=>window.__PROOF_D_RACING__.game.heading>h+0.15,{},heading);await page.keyboard.up('a');await page.keyboard.up('w');
       await page.keyboard.down('s');await page.waitForFunction(()=>window.__PROOF_D_RACING__.game.speed<1);await page.keyboard.up('s');
       await page.keyboard.down('e');await page.waitForFunction(()=>window.__PROOF_D_RACING__.view.policy.orbit>0.2);await page.keyboard.up('e');
       await page.keyboard.down('r');await page.waitForFunction(()=>window.__PROOF_D_RACING__.game.state.getState()==='READY');await page.keyboard.up('r');
