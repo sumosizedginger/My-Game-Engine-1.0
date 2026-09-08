@@ -244,7 +244,7 @@ My Game Engine 1.0 enforces a clean boundary between data definitions and runtim
          │
          ▼
 3. runtime.instantiate() (from runtime/index.js)
-   └── Validates artifact, registers instance in runtime, returns transient record
+   └── Validates artifact and returns a transient runtime instance record
          │
          ▼
 4. entityManager.spawn()
@@ -292,7 +292,7 @@ In `src/games/sequence/game.js`, the game compiles, instantiates, and realizes t
 // 1. Compile definition through the public compiler seam
 const playerArtifact = compileDefinition(PLAYER_DEFINITION);
 
-// 2. Instantiate into runtime instance registry
+// 2. Create transient runtime instance record
 runtime.instantiate(playerArtifact);
 
 // 3. Spawn generational entity handle
