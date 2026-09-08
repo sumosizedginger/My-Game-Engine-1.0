@@ -117,6 +117,7 @@ Entry points:
 - `docs/learn/BUILDING_A_PROCEDURAL_COMBAT_ROOM.md`
 - `docs/learn/BUILDING_A_BOUNDED_PROCEDURAL_WORLD.md`
 - `docs/learn/BUILDING_A_DIFFERENT_GENRE.md`
+- `docs/learn/BUILDING_AN_UNPLANNED_GAME.md`
 
 Learning documents do not override canonical architecture.
 
@@ -582,6 +583,8 @@ Purpose:
 If users repeatedly need internal access, determine whether the API or documentation is wrong.
 
 Do not merely explain a terrible API more loudly.
+
+See `docs/learn/BUILDING_AN_UNPLANNED_GAME.md` for the accepted Proof E learning extraction and blind generality walkthrough.
 
 ---
 

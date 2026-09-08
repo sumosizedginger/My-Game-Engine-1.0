@@ -37,8 +37,9 @@ Accepted implementation now includes:
 - Proof B2: Procedural Combat Room.
 - Proof C: Bounded Procedural World.
 - Proof D: Different Genre, a bounded 3D arcade racer.
+- Proof E: Blind API Generality Test (Order Five, a bounded 3D collection/puzzle game).
 
-Proof E is active: blind public-API usability and generality testing. It has not yet passed. Approved future architecture remains distinct from implemented public behavior.
+Proof E is accepted: a fresh blind participant successfully built Order Five through the documented public engine surface without core engine modification or private API bypass. This provides strong evidence of runtime and compiler public coherence, though it represents generality evidence rather than universal genre support.
 
 Proofs pull architecture. We do not build the entire engine first and hope a game eventually fits it.
 
@@ -54,7 +55,7 @@ npm run build
 npm run dev
 ```
 
-These commands install dependencies, run the test suite and six-target browser evaluator, build static output in `dist/`, and start the development server. Open [Pong](http://localhost:5173/?game=pong) to play the first complete game, or the [arcade racer](http://localhost:5173/?proof=d) for the 3D example. See the [learning index](docs/learn/README.md) for all documented game routes.
+These commands install dependencies, run the test suite and six-target browser evaluator, build static output in `dist/`, and start the development server. Open [Pong](http://localhost:5173/?game=pong) to play the first complete game, the [arcade racer](http://localhost:5173/?proof=d) for the 3D racing proof, or [Order Five](http://localhost:5173/?game=sequence) for the blind public-API collection puzzle. See the [learning index](docs/learn/README.md) for all documented game routes.
 
 ### Public Package Surfaces
 
@@ -84,6 +85,7 @@ These names describe package exports, not npm publication status. The current `/
 1. Follow [Building a Tiny Game](docs/learn/BUILDING_A_TINY_GAME.md), starting with section 3's explicit definition, artifact, runtime-record, entity, and transform construction.
 2. Consult [Gameplay Foundation](GAMEPLAY_FOUNDATION.md) for the entity, transform, fixed-step, input, and state contracts used by that game.
 3. Continue with [Building a Different Genre](docs/learn/BUILDING_A_DIFFERENT_GENRE.md) for scalar keyboard/controller input and the bounded 3D example.
+4. Study [Building an Unplanned Game](docs/learn/BUILDING_AN_UNPLANNED_GAME.md) to see how a fresh participant built an unplanned 3D game using only public documentation and package exports.
 
 ## Repository Truth
 

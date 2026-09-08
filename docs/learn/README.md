@@ -42,6 +42,7 @@ BUILD
 | [Building a Procedural Combat Room](./BUILDING_A_PROCEDURAL_COMBAT_ROOM.md) | Procedural Room Geometry, PBR Materials, Character/Motion Reuse, Fixed-Step Combat, Single Hit Authority, Gamepad Discovery, Cutaway Camera | **Proof B2 (Procedural Combat Room)** | `3990f55858cab8c4e574f9f29ddb954e70919c77` |
 | [Building a Bounded Procedural World](./BUILDING_A_BOUNDED_PROCEDURAL_WORLD.md) | WorldRecipe, Environmental Fields, Terrain from Fields, Vegetation Grounding, Volume Collision, Non-Flat Realized Grounding, Canopy Cutaway | **Proof C — Bounded Procedural World** | `e8fa4f698be684599f3839fec46ac3456b448698` |
 | [Building a Different Genre](./BUILDING_A_DIFFERENT_GENRE.md) | Bounded 3D Arcade Racer, Scalar Semantic Input, Track Truth, Deterministic Vehicle Kinematics, Ordered Checkpoints, Chase Camera, Generality Pressure | **Proof D — Different Genre** | `5fb46b9a3da1a6896530afec86cd205d616e832f` |
+| [Building an Unplanned Game](./BUILDING_AN_UNPLANNED_GAME.md) | Blind Public-API Generality, Unplanned Bounded 3D Puzzle/Collection Game, Kinematic Player, Ordered Collectibles, Deterministic Hazards, Inactive/Active Exit, XZ Planar Collision Adapter, Project-Level Presentation | **Proof E — Blind API Generality** | `c62975dbf68c2305e38c00b9cdc1ed5707777d4a` |
 
 ---
 
@@ -53,7 +54,7 @@ To run and inspect the implementation taught in these guides:
 # Clean dependency installation
 npm ci
 
-# Run the complete automated test suite (176 unit tests across 11 suites)
+# Run the complete automated test suite (186 unit tests across 11 suites)
 npm test
 
 # Run the headless browser evaluation harness (six-target validation + captures)
@@ -78,3 +79,4 @@ Interactive URLs on the local development server (`http://localhost:5173/`):
 - **Proof C Bounded World Controlled Fixture**: `http://localhost:5173/?proof=c&controlled=1`
 - **Proof D Arcade Racer**: `http://localhost:5173/?proof=d`
 - **Proof D Arcade Racer Controlled Fixture**: `http://localhost:5173/?proof=d&controlled=1`
+- **Proof E Order Five Game**: `http://localhost:5173/?game=sequence`
