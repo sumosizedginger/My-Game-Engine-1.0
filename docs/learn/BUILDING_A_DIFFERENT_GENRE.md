@@ -666,11 +666,12 @@ The chase camera demonstrates clean architectural decoupling:
 
 In `tests/racing.test.js` and `tests/racing-browser.test.js`, explicit tests verify that camera manipulation cannot corrupt gameplay truth:
 
-1. A vehicle state snapshot is recorded.
-2. The user aggressively spins the camera orbit back and forth for 90 frames.
+1. A vehicle state snapshot is recorded before camera updates.
+2. A live chase camera is driven for 100 frames in one direction (`camera.update(1, 1/60)`), reaching and asserting the $\pm 1.1\text{ rad}$ orbit clamp.
 3. The resulting vehicle snapshot is compared against the initial snapshot:
-   - Position, heading, speed, distance, ticks, and checkpoint records match exactly.
-   - Only `camera.position` changes.
+   - Position, heading, speed, distance, ticks, and checkpoint records match exactly (`assert.deepEqual(game.snapshot(), before)`).
+   - Only camera pose changes, while a fixed controlled camera ignores orbit inputs entirely (`assert.deepEqual(fixed.pose(...), controlled)`).
+   - Injecting active `CameraOrbit` semantic input during `game.update()` does not alter vehicle speed or race records.
 
 The camera is strictly presentation, never simulation authority.
 
@@ -755,11 +756,11 @@ If `result.dProof.success` is false, `dPageProofSuccess` fails immediately, even
 
 ## 24. Lazy Routing and Bundle Purity: Zero Unneeded Payload
 
-To protect runtime purity and download size, Proof D is loaded lazily in `src/browser/app.js`:
+To protect runtime purity and download size, Proof D is loaded lazily in `src/browser/main.js`:
 
 ```javascript
-// Excerpt from src/browser/app.js
-} else if (params.get('proof') === 'd') {
+// Excerpt from src/browser/main.js
+if (params.get('proof') === 'd') {
   const { createDViewer } = await import('./d-viewer.js');
   createDViewer(app, { controlled: isControlled });
 }
