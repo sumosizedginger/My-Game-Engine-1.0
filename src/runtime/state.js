@@ -94,7 +94,7 @@ export function createStateManager({
 
       const listeners = varListeners.get(key);
       if (listeners) {
-        for (const fn of listeners) {
+        for (const fn of [...listeners]) {
           try {
             fn(value, prev);
           } catch (e) {
@@ -115,17 +115,22 @@ export function createStateManager({
     },
 
     /**
-     * Subscribes to variable changes.
+     * Subscribes to variable changes in registration order. Each notification uses
+     * a snapshot: additions and removals affect subsequent notifications only.
      */
     onVarChange(key, fn) {
       if (!varListeners.has(key)) {
         varListeners.set(key, []);
       }
-      varListeners.get(key).push(fn);
+      const listener = (value, previous) => fn(value, previous);
+      varListeners.get(key).push(listener);
+      let subscribed = true;
       return () => {
+        if (!subscribed) return;
+        subscribed = false;
         const list = varListeners.get(key);
         if (list) {
-          const idx = list.indexOf(fn);
+          const idx = list.indexOf(listener);
           if (idx !== -1) list.splice(idx, 1);
         }
       };

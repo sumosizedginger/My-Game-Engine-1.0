@@ -4,6 +4,103 @@ import assert from 'node:assert/strict';
 import { createStateManager } from '../src/runtime/state.js';
 import { createRuleEngine } from '../src/runtime/rules.js';
 
+test('variable self-unsubscribe preserves eligible listeners and value/previous arguments', () => {
+  const sm = createStateManager({ initialVars: { score: 0 } });
+  const seen = [], values = [];
+  const offA = sm.onVarChange('score', () => { seen.push('A'); offA(); });
+  sm.onVarChange('score', (value, previous) => {
+    seen.push('B'); values.push([value, previous, sm.getVar('score')]);
+  });
+  sm.setVar('score', 1);
+  assert.deepEqual(seen, ['A', 'B']);
+  seen.length = 0;
+  sm.setVar('score', 2);
+  assert.deepEqual(seen, ['B']);
+  assert.deepEqual(values, [[1, 0, 1], [2, 1, 2]]);
+});
+
+test('variable cross-unsubscribe affects subsequent notifications only', () => {
+  const sm = createStateManager(), seen = [];
+  sm.onVarChange('score', () => { seen.push('A'); offB(); });
+  const offB = sm.onVarChange('score', () => seen.push('B'));
+  sm.onVarChange('score', () => seen.push('C'));
+  sm.setVar('score', 1);
+  assert.deepEqual(seen, ['A', 'B', 'C']);
+  for (const value of [2, 3, 3]) {
+    seen.length = 0;
+    sm.setVar('score', value);
+    assert.deepEqual(seen, ['A', 'C']);
+  }
+});
+
+test('variable additions wait until next notification and remain ordered through later removal', () => {
+  const sm = createStateManager(), seen = [];
+  let offC;
+  const offA = sm.onVarChange('score', () => {
+    seen.push('A');
+    if (!offC) offC = sm.onVarChange('score', () => seen.push('C'));
+  });
+  const offB = sm.onVarChange('score', () => seen.push('B'));
+  sm.setVar('score', 1);
+  assert.deepEqual(seen, ['A', 'B']);
+  seen.length = 0; sm.setVar('score', 2);
+  assert.deepEqual(seen, ['A', 'B', 'C']);
+  offA(); offA(); offB();
+  seen.length = 0; sm.setVar('score', 3);
+  assert.deepEqual(seen, ['C']);
+  offC(); offC();
+  seen.length = 0; sm.setVar('score', 4);
+  assert.deepEqual(seen, []);
+});
+
+test('duplicate variable callbacks have independent ordered and idempotent registrations', () => {
+  const sm = createStateManager(), seen = [];
+  const fn = () => seen.push('shared');
+  const off1 = sm.onVarChange('score', fn), off2 = sm.onVarChange('score', fn);
+  off1(); off1();
+  sm.setVar('score', 1);
+  assert.deepEqual(seen, ['shared']);
+  off2(); off2();
+  seen.length = 0; sm.setVar('score', 2);
+  assert.deepEqual(seen, []);
+  sm.onVarChange('score', fn);
+  sm.onVarChange('score', () => seen.push('middle'));
+  const offLast = sm.onVarChange('score', fn);
+  offLast(); offLast();
+  sm.setVar('score', 3);
+  assert.deepEqual(seen, ['shared', 'middle']);
+});
+
+test('variable listener errors retain reporting and do not prevent later eligible callbacks', t => {
+  const errors = [], seen = [];
+  t.mock.method(console, 'error', (...args) => errors.push(args));
+  const sm = createStateManager({ initialVars: { score: 0 } });
+  const failure = new Error('variable listener failure');
+  sm.onVarChange('score', () => { throw failure; });
+  sm.onVarChange('score', (value, previous) => seen.push([value, previous]));
+  sm.setVar('score', 1);
+  assert.deepEqual(seen, [[1, 0]]);
+  assert.equal(sm.getVar('score'), 1);
+  assert.deepEqual(errors, [['[StateManager] Var listener error on score:', failure]]);
+});
+
+test('variable subscription mutations remain isolated by key', () => {
+  const sm = createStateManager(), seen = [];
+  const shared = (value, previous) => seen.push([value, previous]);
+  const offA = sm.onVarChange('A', () => { seen.push('A'); offA(); });
+  const offSharedA = sm.onVarChange('A', shared);
+  const offSharedB = sm.onVarChange('B', shared);
+  sm.setVar('A', 10);
+  assert.deepEqual(seen, ['A', [10, undefined]]);
+  offSharedA(); offSharedA();
+  seen.length = 0;
+  sm.setVar('B', 20); sm.setVar('A', 11); sm.setVar('B', 21);
+  assert.deepEqual(seen, [[20, undefined], [21, 20]]);
+  offSharedB(); offSharedB();
+  seen.length = 0; sm.setVar('B', 22);
+  assert.deepEqual(seen, []);
+});
+
 test('state reset rejects undeclared targets without changing state, variables or notifications', () => {
   const state = createStateManager({ initialState: 'A', validStates: ['A', 'B'], initialVars: { score: 1 } });
   state.transition('B');
