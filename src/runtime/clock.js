@@ -40,13 +40,17 @@ export function createSimulationClock({
     /**
      * Advances the simulation clock by real elapsed time.
      *
-     * @param {number} deltaMs - Elapsed frame time in milliseconds.
+     * @param {number} deltaMs - Finite elapsed frame time in milliseconds.
      * @param {Function} stepFn - Callback executed for each fixed simulation step: stepFn(fixedDelta, tickIndex).
      * @returns {object} { steps: number, alpha: number, totalTicks: number }
+     * @throws {TypeError} If deltaMs is not finite or stepFn is not a function; clock state is unchanged.
      */
     advance(deltaMs, stepFn) {
       if (typeof stepFn !== 'function') {
         throw new TypeError('Simulation stepFn must be a function');
+      }
+      if (!Number.isFinite(deltaMs)) {
+        throw new TypeError('Simulation deltaMs must be a finite number');
       }
 
       // Convert ms to seconds and clamp to 250ms max frame delay to prevent spiral of death
