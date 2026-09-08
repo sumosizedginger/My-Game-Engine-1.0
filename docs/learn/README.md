@@ -29,6 +29,7 @@ BUILD
 1. **No Speculative Architecture**: We never teach planned, promised, or hypothetical APIs. If a feature does not exist as tested code in the canonical repository, it does not appear in a learning guide.
 2. **Authority Order**: Canonical specifications (`CONSTITUTION.md`, `PRD.md`, `ARCHITECTURE.md`, `GAMEPLAY_FOUNDATION.md`) outrank learning guides. If a tutorial and a canonical specification conflict, the specification wins and the tutorial must be updated.
 3. **Inspectable & Executable Companions**: Code examples in these lessons are extracted directly from working source files and test suites. They are designed to be inspected, verified, and run using the engine's real toolchain.
+4. **Subsystem Visibility vs. Package Exports**: Learning guides for 3D proofs (B1, B2, C, D) reference accepted repository-level engine systems (e.g. `src/geometry/`, `src/material/`, `src/character/`, `src/motion/`, `src/world/`). These are internal repository implementations, not package subpath exports. Ordinary project code does not require them merely to create 3D presentation; direct Three.js presentation in project code remains fully legitimate where procedural forge compilation is not required.
 
 ---
 

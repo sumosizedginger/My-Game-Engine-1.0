@@ -75,7 +75,9 @@ import { compileDefinition }
   from '@sumosizedginger/my-game-engine-1.0/full';
 ```
 
-These names describe package exports, not npm publication status. The current `/full` export does not re-export every generation subsystem; use the relevant public lesson for the implemented generation APIs.
+These package export names resolve under Node and Vite package self-reference. When developing games inside this repository, importing the same public barrel files by repository-relative path (for example, `../../runtime/index.js` or `../../full/index.js`) is also legitimate, because those files are the direct implementation targets of the public package exports.
+
+These names describe package exports, not npm publication status. The current `/full` export does not re-export every generation subsystem; repository-level Forge systems (such as `src/geometry/` or `src/material/`) are internal engine implementations rather than package subpath exports. Ordinary project code does not need them merely to create 3D presentation; direct Three.js project presentation remains fully legitimate where procedural forge compilation is not required.
 
 ### Build Your First Game
 

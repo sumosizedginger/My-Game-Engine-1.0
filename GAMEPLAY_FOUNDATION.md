@@ -243,6 +243,27 @@ Box {
     $$\Delta Y = \frac{\text{ball.y} - \text{paddle.y}}{\text{paddle.halfHeight}} \times \text{deflectionSpeed}$$
 - Zero external physics engine is used. Arithmetic is deterministic.
 
+### 6.2 Planar XZ / XY Collision Adapter
+
+`checkAABB(a, b)` in `src/runtime/collision.js` is a generic 2D rectangle overlap primitive:
+
+```javascript
+export function checkAABB(a, b) {
+  return (
+    Math.abs(a.x - b.x) <= a.halfWidth + b.halfWidth &&
+    Math.abs(a.y - b.y) <= a.halfHeight + b.halfHeight
+  );
+}
+```
+
+For games whose gameplay plane is the horizontal ground ($XZ$), project code may legitimately adapt this 2D primitive by mapping:
+- World $X \to$ Box $x$
+- World $Z \to$ Box $y$
+- Half-extent $X \to$ `halfWidth`
+- Half-extent $Z \to$ `halfHeight`
+
+This is a project-level adapter pattern for planar overlap checks (such as top-down item pickups, hazard zones, or footprint containment). It is strictly a 2D planar projection check, not a 3D volumetric collision system. The engine provides this pure math primitive; games define their own projection mappings as needed.
+
 ---
 
 ## 7. Runtime Variables, State, and Rules
@@ -257,12 +278,29 @@ A key-value variable registry tracks match metadata:
 
 ### 7.2 Finite State Primitives
 
+`createStateManager` provides a discrete state machine and variable registry:
+
+```javascript
+export function createStateManager({
+  initialState = 'SERVE',
+  validStates = ['SERVE', 'PLAYING', 'ROUND_OVER', 'GAME_OVER', 'PAUSED'],
+  initialVars = {}
+} = {})
+```
+
 The game state machine operates across explicit phases:
 - `SERVE`: Ball stationary; waiting for serve or timer.
 - `PLAYING`: Active rally in progress.
 - `ROUND_OVER`: Point scored; resetting positions.
 - `GAME_OVER`: Winning score reached; match concluded.
 - `PAUSED`: Simulation suspended.
+
+> [!IMPORTANT]
+> **Explicit State Configuration Recommended**: For backwards compatibility with Proof A, `createStateManager()` retains historical Pong-shaped defaults (`initialState: 'SERVE'`, `validStates: ['SERVE', 'PLAYING', 'ROUND_OVER', 'GAME_OVER', 'PAUSED']`) when called with no arguments.
+> New games should always explicitly provide `initialState` and `validStates` matching their own game loop. For example:
+> - Combat room: `initialState: 'READY'`, `validStates: ['READY', 'ENGAGED', 'VICTORY', 'DEFEAT']`
+> - Arcade racer: `initialState: 'READY'`, `validStates: ['READY', 'COUNTDOWN', 'RACING', 'FINISHED']`
+> - Collection puzzle: `initialState: 'TITLE'`, `validStates: ['TITLE', 'PLAYING', 'VICTORY', 'GAMEOVER']`
 
 ### 7.3 Declarative Rules Engine
 

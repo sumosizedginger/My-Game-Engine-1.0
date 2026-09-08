@@ -70,6 +70,8 @@ My-Game-Engine-1.0/
     ├── combat.test.js            # ArenaCombatGame lifecycle, AI FSM, hit resolution
     └── input.test.js             # Generic gamepad bindings, deadzones, slot discovery
 ```
+> [!NOTE]
+> **Repository Engine Systems vs. Package Exports**: Geometry Forge (`src/geometry/`) and Material Forge (`src/material/`) are accepted repository-level engine systems used in these integration examples. They are **not** currently package subpath exports (such as `@sumosizedginger/my-game-engine-1.0/runtime` or `/full`). Ordinary project code does not require them merely to create 3D presentation; direct Three.js meshes, materials, and geometries in project code remain fully legitimate where procedural forge compilation is not required.
 
 ---
 
