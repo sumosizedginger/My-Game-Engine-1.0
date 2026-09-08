@@ -29,11 +29,11 @@ import { createLocomotionEvaluator, MOTION_PRESETS, commitRootMotionIntent } fro
 
 export function createB1Viewer({ container, isControlled = false }) {
   // 1. Scene setup
-  const scene = new Scene();
+  let scene = new Scene();
   scene.background = new Color(0x181a20);
 
   // 2. Camera setup (positioned to inspect full character height and foot grounding)
-  const camera = new PerspectiveCamera(
+  let camera = new PerspectiveCamera(
     45,
     container.clientWidth / (container.clientHeight || 560),
     0.1,
@@ -43,20 +43,21 @@ export function createB1Viewer({ container, isControlled = false }) {
   camera.lookAt(0, 0.90, 0);
 
   // 3. Renderer setup
-  const renderer = new WebGLRenderer({ antialias: true, alpha: false });
+  let renderer = new WebGLRenderer({ antialias: true, alpha: false });
   renderer.setSize(container.clientWidth, container.clientHeight || 560);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   container.appendChild(renderer.domElement);
 
   // 4. Studio Environment: 1-meter Floor Grid
-  const gridHelper = new GridHelper(10, 10, 0x475569, 0x334155);
+  let gridHelper = new GridHelper(10, 10, 0x475569, 0x334155);
   gridHelper.position.y = 0;
   scene.add(gridHelper);
 
   // Subtle floor shadow receiver
-  const floorGeo = new PlaneGeometry(10, 10);
-  const floorMat = new MeshBasicMaterial({ color: 0x14161c, depthWrite: false });
-  const floorPlane = new Mesh(floorGeo, floorMat);
+  let floorPlane = new Mesh(
+    new PlaneGeometry(10, 10),
+    new MeshBasicMaterial({ color: 0x14161c, depthWrite: false })
+  );
   floorPlane.rotation.x = -Math.PI / 2;
   floorPlane.position.y = -0.001;
   scene.add(floorPlane);
@@ -90,17 +91,40 @@ export function createB1Viewer({ container, isControlled = false }) {
   let running = !isControlled;
   let lastTime = performance.now();
   let animationFrameId = null;
+  let disposed = false;
 
   const charTransform = { position: { x: 0, y: 0, z: 0 } };
   let lastUpdateResult = null;
 
+  function requireAlive() {
+    if (disposed) throw new Error('B1 viewer has been destroyed');
+  }
+
+  // Only used for hierarchies constructed and exclusively owned by this viewer.
+  function disposeOwnedObject(object) {
+    const resources = new Set();
+    object.traverse(child => {
+      if (child.geometry) resources.add(child.geometry);
+      const materials = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of materials) if (material) resources.add(material);
+      if (child.isSkinnedMesh) resources.add(child.skeleton);
+    });
+    object.removeFromParent();
+    for (const resource of resources) resource.dispose();
+  }
+
+  function disposeCurrentCharacter() {
+    if (skeletonHelper) disposeOwnedObject(skeletonHelper);
+    if (character) disposeOwnedObject(character.mesh);
+    skeletonHelper = null;
+    character = null;
+    evaluator = null;
+    lastUpdateResult = null;
+  }
+
   function initCharacter() {
-    if (character && character.mesh) {
-      scene.remove(character.mesh);
-    }
-    if (skeletonHelper) {
-      scene.remove(skeletonHelper);
-    }
+    requireAlive();
+    disposeCurrentCharacter();
 
     character = buildHumanoidCharacter(currentCharPreset, {
       wireframe: isWireframe
@@ -136,18 +160,18 @@ export function createB1Viewer({ container, isControlled = false }) {
     camera.lookAt(0, cy, 0);
   }
 
-  const canvas = renderer.domElement;
-  canvas.addEventListener('mousedown', (e) => {
+  let canvas = renderer.domElement;
+  function onMouseDown(e) {
     isDragging = true;
     prevMouseX = e.clientX;
     prevMouseY = e.clientY;
-  });
+  }
 
-  window.addEventListener('mouseup', () => {
+  function onMouseUp() {
     isDragging = false;
-  });
+  }
 
-  window.addEventListener('mousemove', (e) => {
+  function onMouseMove(e) {
     if (!isDragging) return;
     const dx = e.clientX - prevMouseX;
     const dy = e.clientY - prevMouseY;
@@ -157,16 +181,21 @@ export function createB1Viewer({ container, isControlled = false }) {
     orbitPhi -= dx * 0.008;
     orbitTheta = Math.max(-0.1, Math.min(1.2, orbitTheta + dy * 0.008));
     updateCameraTransform();
-  });
+  }
 
-  canvas.addEventListener('wheel', (e) => {
+  function onWheel(e) {
     e.preventDefault();
     orbitRadius = Math.max(1.2, Math.min(8.0, orbitRadius + e.deltaY * 0.003));
     updateCameraTransform();
-  }, { passive: false });
+  }
+  canvas.addEventListener('mousedown', onMouseDown);
+  canvas.addEventListener('wheel', onWheel, { passive: false });
+  window.addEventListener('mouseup', onMouseUp);
+  window.addEventListener('mousemove', onMouseMove);
 
   // 8. Simulation Step
   function step(deltaMs) {
+    requireAlive();
     const deltaSec = deltaMs * 0.001;
     const effectiveDelta = isSlowMotion ? deltaSec * 0.25 : deltaSec;
 
@@ -253,14 +282,14 @@ export function createB1Viewer({ container, isControlled = false }) {
 
   // 12. Public API and Contract for Evaluation
   const viewerApi = {
-    ready: true,
-    get characterId() { return character.id; },
-    get vertexCount() { return character.geometryData.vertexCount; },
-    get triangleCount() { return character.geometryData.triangleCount; },
-    get boneCount() { return character.bones.length; },
-    get skinningNormalized() { return character.skinning.stats.allNormalized; },
-    get maxNormalizationError() { return character.skinning.stats.maxNormalizationError; },
-    getPhase: () => evaluator.getPhase(),
+    get ready() { return !disposed; },
+    get characterId() { return character?.id ?? null; },
+    get vertexCount() { return character?.geometryData.vertexCount ?? 0; },
+    get triangleCount() { return character?.geometryData.triangleCount ?? 0; },
+    get boneCount() { return character?.bones.length ?? 0; },
+    get skinningNormalized() { return character?.skinning.stats.allNormalized ?? false; },
+    get maxNormalizationError() { return character?.skinning.stats.maxNormalizationError ?? null; },
+    getPhase: () => evaluator?.getPhase() ?? null,
     getRealizedFootPositions() {
       if (!character || !character.bonesByName) return null;
       const leftVec = new Vector3();
@@ -272,7 +301,7 @@ export function createB1Viewer({ container, isControlled = false }) {
         right: { x: rightVec.x, y: rightVec.y, z: rightVec.z }
       };
     },
-    getStats: () => ({
+    getStats: () => disposed ? null : ({
       phase: evaluator.getPhase(),
       speed: evaluator.getSpeed(),
       parameters: evaluator.getParameters(),
@@ -286,6 +315,7 @@ export function createB1Viewer({ container, isControlled = false }) {
     }),
     step,
     setCharPreset(preset) {
+      requireAlive();
       if (HUMANOID_PRESETS[preset]) {
         currentCharPreset = preset;
         initCharacter();
@@ -293,6 +323,7 @@ export function createB1Viewer({ container, isControlled = false }) {
       }
     },
     setMotionPreset(preset) {
+      requireAlive();
       if (MOTION_PRESETS[preset]) {
         currentMotionPreset = preset;
         evaluator = createLocomotionEvaluator(character, currentMotionPreset);
@@ -300,6 +331,7 @@ export function createB1Viewer({ container, isControlled = false }) {
       }
     },
     setCameraOrbit(phi, theta, radius) {
+      requireAlive();
       if (phi !== undefined) orbitPhi = phi;
       if (theta !== undefined) orbitTheta = theta;
       if (radius !== undefined) orbitRadius = radius;
@@ -307,6 +339,7 @@ export function createB1Viewer({ container, isControlled = false }) {
       if (!running) renderer.render(scene, camera);
     },
     toggleWireframe() {
+      requireAlive();
       isWireframe = !isWireframe;
       if (character && character.material) {
         character.material.wireframe = isWireframe;
@@ -315,6 +348,7 @@ export function createB1Viewer({ container, isControlled = false }) {
       return isWireframe;
     },
     toggleBones() {
+      requireAlive();
       showBones = !showBones;
       if (skeletonHelper) {
         skeletonHelper.visible = showBones;
@@ -323,10 +357,12 @@ export function createB1Viewer({ container, isControlled = false }) {
       return showBones;
     },
     toggleSlowMotion() {
+      requireAlive();
       isSlowMotion = !isSlowMotion;
       return isSlowMotion;
     },
     toggleFreeWalk() {
+      requireAlive();
       isFreeWalk = !isFreeWalk;
       if (!isFreeWalk) {
         charTransform.position.x = 0;
@@ -336,13 +372,25 @@ export function createB1Viewer({ container, isControlled = false }) {
       return isFreeWalk;
     },
     destroy() {
+      if (disposed) return;
+      disposed = true;
       running = false;
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+      isDragging = false;
+      canvas.removeEventListener('mousedown', onMouseDown);
+      canvas.removeEventListener('wheel', onWheel);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('resize', onResize);
+      disposeCurrentCharacter();
+      disposeOwnedObject(gridHelper);
+      disposeOwnedObject(floorPlane);
+      scene.clear();
       renderer.dispose();
-      if (renderer.domElement && renderer.domElement.parentNode) {
-        renderer.domElement.parentNode.removeChild(renderer.domElement);
-      }
+      canvas.remove();
+      gridHelper = floorPlane = scene = camera = renderer = canvas = null;
+      if (window.__PROOF_B1_MOTION__ === viewerApi) delete window.__PROOF_B1_MOTION__;
     }
   };
 
