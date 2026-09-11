@@ -71,6 +71,13 @@ export function createPreviewable({
     parts: mesh.parts.length,
     materials: materialOrder.length,
     groups: mesh.parts.length,
+    // PREDICTED, not measured. A Previewable is one Mesh with one geometry
+    // group per part, and a renderer issues one draw call per group, so the
+    // part count is the draw-call count. Predicting it is what allows the
+    // budget to refuse a pathological asset BEFORE allocating GPU resources.
+    // tests/preview-browser.test.js asserts this prediction against the
+    // renderer's own measured figure.
+    drawCalls: mesh.parts.length,
     generationMs
   };
 

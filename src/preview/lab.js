@@ -22,8 +22,8 @@ import {
   Scene, Color, PerspectiveCamera, WebGLRenderer,
   HemisphereLight, DirectionalLight, Vector3
 } from 'three';
-import { CANONICAL_VIEWS, solveCanonicalView } from './views.js';
-import { PREVIEW_BUDGET_DEFAULTS } from './budget.js';
+import { CANONICAL_VIEWS, solveCanonicalView, boundingRadius } from './views.js';
+import { PREVIEW_BUDGET_DEFAULTS, resolveDevicePixelRatio } from './budget.js';
 
 /**
  * Neutral studio ground for canonical inspection.
@@ -33,6 +33,23 @@ import { PREVIEW_BUDGET_DEFAULTS } from './budget.js';
  * feedback loop depends on.
  */
 export const PREVIEW_GROUND_COLOR = 0x6f757d;
+
+/**
+ * Number of Preview Lab instances currently holding resources and listeners.
+ *
+ * Repeated create/dispose cycles must return this to zero. A page reload proves
+ * nothing about lifecycle correctness — it discards the whole JavaScript world
+ * — so this counter is the evidence that dispose actually released what create
+ * acquired, within one page.
+ */
+let liveLabs = 0;
+
+/**
+ * @returns {number} Live Preview Lab instances.
+ */
+export function livePreviewLabCount() {
+  return liveLabs;
+}
 
 /**
  * Mounts a Previewable into a container element.
@@ -83,7 +100,10 @@ export function createPreviewLab({
   const camera = new PerspectiveCamera(35, width / height, 0.01, 100);
 
   const renderer = new WebGLRenderer({ antialias: true, alpha: false });
-  const dpr = Math.min(globalThis.devicePixelRatio || 1, budget.maxDpr);
+  // DPR is explicit safe degradation, not refusal. Both the requested and the
+  // effective value are reported, with a diagnostic when a clamp occurred.
+  const dprResolution = resolveDevicePixelRatio(globalThis.devicePixelRatio || 1, budget);
+  const dpr = dprResolution.effectiveDpr;
   renderer.setPixelRatio(dpr);
   renderer.setSize(width, height);
   renderer.domElement.style.display = 'block';
@@ -132,8 +152,11 @@ export function createPreviewLab({
     );
     camera.up.set(...baseCamera.up);
     camera.lookAt(target);
-    camera.near = Math.max(radius / 1000, 0.001);
-    camera.far = radius * 8;
+    // Depth range from the asset's own extent, so orbiting and zooming keep
+    // the whole asset inside the frustum without clipping near geometry.
+    const assetRadius = boundingRadius(previewable.bounds) || radius * 0.1;
+    camera.near = Math.max(radius - assetRadius * 2, radius / 10000);
+    camera.far = radius + assetRadius * 4;
     camera.updateProjectionMatrix();
   }
 
@@ -205,6 +228,7 @@ export function createPreviewLab({
   renderer.domElement.addEventListener('pointercancel', onPointerUp);
   renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
   globalThis.addEventListener?.('resize', onResize);
+  liveLabs += 1;
 
   requestRender();
 
@@ -270,11 +294,21 @@ export function createPreviewLab({
       if (disposed) return null;
       return {
         ...previewable.stats,
+        // predictedDrawCalls comes from the Previewable's pre-render budget
+        // check; drawCalls is what the renderer actually issued.
+        predictedDrawCalls: previewable.stats.drawCalls,
         drawCalls: renderer.info.render.calls,
         renderedTriangles: renderer.info.render.triangles,
         geometriesInMemory: renderer.info.memory.geometries,
         texturesInMemory: renderer.info.memory.textures,
+        requestedDpr: dprResolution.requestedDpr,
+        effectiveDpr: dprResolution.effectiveDpr,
+        dprClamped: dprResolution.clamped,
         dpr,
+        surfaceWidth: renderer.domElement.clientWidth,
+        surfaceHeight: renderer.domElement.clientHeight,
+        drawingBufferWidth: renderer.domElement.width,
+        drawingBufferHeight: renderer.domElement.height,
         lastFrameMs,
         view: currentView
       };
@@ -297,6 +331,15 @@ export function createPreviewLab({
 
     requestRender,
 
+    /**
+     * Diagnostics the lab itself produced, such as an applied DPR clamp.
+     *
+     * @returns {Array<object>}
+     */
+    getDiagnostics() {
+      return dprResolution.diagnostic ? [dprResolution.diagnostic] : [];
+    },
+
     get frameScheduled() {
       return frameRequested;
     },
@@ -312,6 +355,7 @@ export function createPreviewLab({
     dispose() {
       if (disposed) return;
       disposed = true;
+      liveLabs -= 1;
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerup', onPointerUp);

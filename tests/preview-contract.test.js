@@ -5,7 +5,8 @@ import { createPreviewable } from '../src/preview/previewable.js';
 import {
   PREVIEW_BUDGET_DEFAULTS,
   evaluatePreviewBudget,
-  enforcePreviewBudget
+  enforcePreviewBudget,
+  resolveDevicePixelRatio
 } from '../src/preview/budget.js';
 import { createBoxMesh, createCylinderMesh, mergeMeshIR, transformMesh } from '../src/geometry/mesh-ops.js';
 import { createMaterialDefinition } from '../src/material/index.js';
@@ -47,9 +48,51 @@ test('measured stats are reported, unmeasured values are not fabricated', () => 
   assert.ok(p.stats.vertices > 0);
   // generationMs was not supplied, so it is null rather than invented.
   assert.equal(p.stats.generationMs, null);
-  // drawCalls requires a real render and is absent outside the browser.
-  assert.equal(p.stats.drawCalls, undefined);
+  // drawCalls is a PREDICTION from the one-group-per-part architecture, needed
+  // so the budget can refuse before allocating GPU resources. The browser test
+  // asserts the prediction against the renderer's measured figure.
+  assert.equal(p.stats.drawCalls, p.stats.parts);
+  assert.equal(p.stats.groups, p.stats.parts);
   p.dispose();
+});
+
+test('the budget separates fail-closed limits from degradation limits', () => {
+  const report = evaluatePreviewBudget({ triangles: 10 }, PREVIEW_BUDGET_DEFAULTS);
+  assert.deepEqual(report.failClosedDimensions.sort(), [
+    'maxDrawCalls', 'maxGenerationMs', 'maxMaterials', 'maxParts', 'maxTriangles', 'maxVertices'
+  ]);
+  assert.deepEqual(report.degradationDimensions, ['maxDpr']);
+  // A high DPR is degradation, never a refusal: it does not make an asset
+  // pathological, only expensive to rasterize.
+  assert.equal(evaluatePreviewBudget({ triangles: 10, dpr: 8 }, PREVIEW_BUDGET_DEFAULTS).withinBudget, true);
+});
+
+test('maxDrawCalls is actually enforced, not merely advertised', () => {
+  const mesh = fixtureMesh();
+  assert.throws(
+    () => createPreviewable({ mesh, materials: MATERIALS(), budget: { ...PREVIEW_BUDGET_DEFAULTS, maxDrawCalls: 1 } }),
+    (err) => {
+      assert.ok(err.diagnostics.some((d) => d.data?.statName === 'drawCalls'));
+      return true;
+    }
+  );
+});
+
+test('DPR clamping reports requested and effective values with a diagnostic', () => {
+  const within = resolveDevicePixelRatio(1.5, PREVIEW_BUDGET_DEFAULTS);
+  assert.equal(within.clamped, false);
+  assert.equal(within.effectiveDpr, 1.5);
+  assert.equal(within.diagnostic, null);
+
+  const clamped = resolveDevicePixelRatio(3, PREVIEW_BUDGET_DEFAULTS);
+  assert.equal(clamped.clamped, true);
+  assert.equal(clamped.requestedDpr, 3);
+  assert.equal(clamped.effectiveDpr, PREVIEW_BUDGET_DEFAULTS.maxDpr);
+  assert.equal(clamped.diagnostic.code, 'PREVIEW_DPR_CLAMPED');
+  assert.equal(clamped.diagnostic.data.requestedDpr, 3);
+
+  // Degradation is visible, never silent.
+  assert.ok(clamped.diagnostic.message.includes('clamped'));
 });
 
 test('materials come from Material Forge, never invented by the preview', () => {

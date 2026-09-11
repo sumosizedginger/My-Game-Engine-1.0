@@ -46,6 +46,19 @@ export const ATTRIBUTE_MERGE_DEFAULTS = Object.freeze({
 });
 
 /**
+ * Describes a value's type for a diagnostic payload, without throwing on
+ * anything a caller might hand in.
+ *
+ * @param {*} value
+ * @returns {string}
+ */
+function describeType(value) {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+}
+
+/**
  * Normalizes negative zero to positive zero.
  * Required for byte-deterministic encoding: -0 and 0 compare equal but encode
  * to different bytes.
@@ -129,8 +142,17 @@ export function computeRangeBounds(positions, indices, indexStart = 0, indexCoun
 }
 
 /**
- * Builds a part record. `semanticName` is required at the asset part boundary;
- * anonymous parts defeat the entire purpose of the part table.
+ * Builds a part record.
+ *
+ * `id` and `semanticName` are enforced HERE, at the public construction
+ * boundary, not only in validation. The law is that anonymous parts are refused
+ * at every entry point; leaving construction permissive while only validation
+ * refused them made the implementation contradict its own stated law.
+ *
+ * `bounds` is DERIVED data, not authored source. Callers may pass a
+ * precomputed value, but `createMesh` re-derives every part's bounds from
+ * positions, indices and the part's index range, so a false value can never
+ * reach the manifest.
  *
  * @param {object} options
  * @returns {object} Frozen part record.
@@ -145,6 +167,22 @@ export function createPart({
   materialId = null,
   bounds = null
 }) {
+  if (!id || typeof id !== 'string' || id.trim() === '') {
+    throw new TypeError('createPart requires a non-empty string id');
+  }
+  if (!semanticName || typeof semanticName !== 'string' || semanticName.trim() === '') {
+    throw new TypeError(
+      `createPart requires a non-empty semanticName for part "${id}". ` +
+      'Anonymous parts are refused: the part table exists so generated content can be ' +
+      'measured and revised by name.'
+    );
+  }
+  if (!Number.isInteger(indexStart) || indexStart < 0) {
+    throw new TypeError(`createPart part "${id}" requires a non-negative integer indexStart`);
+  }
+  if (!Number.isInteger(indexCount) || indexCount <= 0) {
+    throw new TypeError(`createPart part "${id}" requires a positive integer indexCount`);
+  }
   return Object.freeze({
     id,
     semanticName,
@@ -199,16 +237,13 @@ export function createMesh({
     }
   }
 
-  // Fill any part missing bounds from its own index range, so per-part
-  // measurement is always present in the manifest.
-  const resolvedParts = parts.map((part) =>
-    part.bounds
-      ? createPart(part)
-      : createPart({
-        ...part,
-        bounds: computeRangeBounds(position, indexArray, part.indexStart, part.indexCount)
-      })
-  );
+  // Part bounds are DERIVED, always. A caller-supplied value is discarded
+  // rather than trusted, so the manifest's per-part measurements are
+  // authoritative geometry facts and cannot be asserted into being.
+  const resolvedParts = parts.map((part) => createPart({
+    ...part,
+    bounds: computeRangeBounds(position, indexArray, part.indexStart, part.indexCount)
+  }));
 
   const mesh = Object.freeze({
     version: MESH_IR_VERSION,
@@ -362,48 +397,89 @@ export function validateMesh(mesh) {
   }
 
   // Parts must exactly partition the index buffer.
-  if (!Array.isArray(mesh.parts) || mesh.parts.length === 0) {
+  //
+  // This block is written so that NO malformed input can escape as a raw
+  // TypeError: validateMesh promises structured diagnostics, and a caller
+  // handed an arbitrary object must get diagnostics back, not a crash.
+  const partList = Array.isArray(mesh.parts) ? mesh.parts : [];
+  if (!Array.isArray(mesh.parts)) {
+    fail('MESH_PARTS_INVALID', 'MeshIR parts must be an array', { received: describeType(mesh.parts) });
+  } else if (mesh.parts.length === 0) {
     fail('MESH_PARTS_EMPTY', 'MeshIR requires at least one part');
-  } else {
-    const seen = new Set();
-    let cursor = 0;
-    const ordered = [...mesh.parts].sort((a, b) => a.indexStart - b.indexStart);
-    for (const part of ordered) {
-      if (!part.semanticName || typeof part.semanticName !== 'string' || part.semanticName.trim() === '') {
-        fail('MESH_PART_UNNAMED', `part ${part.id} has no semanticName`, { partId: part.id });
+  }
+
+  const seen = new Set();
+  let cursor = 0;
+  const ordered = partList
+    .filter((part) => {
+      if (!part || typeof part !== 'object') {
+        fail('MESH_PART_INVALID', 'every part must be an object', { received: describeType(part) });
+        return false;
       }
-      if (!part.id || typeof part.id !== 'string') {
-        fail('MESH_PART_ID', 'every part requires a string id');
-      } else if (seen.has(part.id)) {
-        fail('MESH_PART_DUPLICATE', `duplicate part id ${part.id}`, { partId: part.id });
-      } else {
-        seen.add(part.id);
-      }
-      if (part.indexStart !== cursor) {
-        fail(
-          'MESH_PART_PARTITION',
-          `part ${part.id} starts at ${part.indexStart}, expected ${cursor}; parts must exactly partition the index buffer`,
-          { partId: part.id, indexStart: part.indexStart, expected: cursor }
-        );
-      }
-      if (!(part.indexCount > 0) || part.indexCount % 3 !== 0) {
-        fail('MESH_PART_COUNT', `part ${part.id} indexCount must be a positive multiple of 3`, { partId: part.id });
-      }
-      cursor = part.indexStart + part.indexCount;
+      return true;
+    })
+    .sort((a, b) => (Number(a.indexStart) || 0) - (Number(b.indexStart) || 0));
+
+  for (const part of ordered) {
+    const label = typeof part.id === 'string' && part.id ? part.id : '<unnamed>';
+
+    if (!part.id || typeof part.id !== 'string') {
+      fail('MESH_PART_ID', 'every part requires a string id');
+    } else if (seen.has(part.id)) {
+      fail('MESH_PART_DUPLICATE', `duplicate part id ${part.id}`, { partId: part.id });
+    } else {
+      seen.add(part.id);
     }
-    if (cursor !== indices.length) {
+
+    if (!part.semanticName || typeof part.semanticName !== 'string' || part.semanticName.trim() === '') {
+      fail('MESH_PART_UNNAMED', `part ${label} has no semanticName`, { partId: label });
+    }
+
+    const hasValidRange =
+      Number.isInteger(part.indexStart) && part.indexStart >= 0 &&
+      Number.isInteger(part.indexCount) && part.indexCount > 0;
+
+    if (!hasValidRange) {
       fail(
-        'MESH_PART_COVERAGE',
-        `parts cover ${cursor} indices but the index buffer has ${indices.length}`,
-        { covered: cursor, total: indices.length }
+        'MESH_PART_RANGE',
+        `part ${label} requires integer indexStart >= 0 and indexCount > 0`,
+        { partId: label, indexStart: part.indexStart, indexCount: part.indexCount }
+      );
+      continue;
+    }
+    if (part.indexCount % 3 !== 0) {
+      fail('MESH_PART_COUNT', `part ${label} indexCount must be a multiple of 3`, { partId: label });
+    }
+    if (part.indexStart !== cursor) {
+      fail(
+        'MESH_PART_PARTITION',
+        `part ${label} starts at ${part.indexStart}, expected ${cursor}; parts must exactly partition the index buffer`,
+        { partId: label, indexStart: part.indexStart, expected: cursor }
       );
     }
+    cursor = part.indexStart + part.indexCount;
+  }
+
+  if (partList.length > 0 && cursor !== indices.length) {
+    fail(
+      'MESH_PART_COVERAGE',
+      `parts cover ${cursor} indices but the index buffer has ${indices.length}`,
+      { covered: cursor, total: indices.length }
+    );
   }
 
   // Anchors.
-  const partIds = new Set(mesh.parts.map((p) => p.id));
+  const partIds = new Set(partList.filter((p) => p && typeof p.id === 'string').map((p) => p.id));
   const anchorNames = new Set();
-  for (const anchor of mesh.anchors ?? []) {
+  const anchorList = Array.isArray(mesh.anchors) ? mesh.anchors : [];
+  if (mesh.anchors !== undefined && mesh.anchors !== null && !Array.isArray(mesh.anchors)) {
+    fail('MESH_ANCHORS_INVALID', 'MeshIR anchors must be an array', { received: describeType(mesh.anchors) });
+  }
+  for (const anchor of anchorList) {
+    if (!anchor || typeof anchor !== 'object') {
+      fail('ANCHOR_INVALID', 'every anchor must be an object', { received: describeType(anchor) });
+      continue;
+    }
     if (!anchor.name || typeof anchor.name !== 'string') {
       fail('ANCHOR_NAME', 'every anchor requires a string name');
       continue;

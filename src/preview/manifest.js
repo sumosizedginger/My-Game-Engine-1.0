@@ -94,7 +94,11 @@ export function createAssetPreviewManifest(previewable, { captures = [], perform
       cameraTarget: [...capture.cameraTarget],
       up: [...capture.up],
       fovDeg: capture.fovDeg,
+      aspect: capture.aspect ?? null,
       viewport: { width: capture.viewport.width, height: capture.viewport.height },
+      // Fraction of the frame the asset occupies. Tells a reviewer whether the
+      // view carries information or is a postage stamp.
+      occupancy: capture.occupancy ? { width: capture.occupancy.width, height: capture.occupancy.height } : null,
       environment: capture.environment ? { ...capture.environment } : null,
       imagePath: capture.imagePath ?? null,
       imageHash: capture.imageHash ?? null

@@ -478,6 +478,63 @@ export function extrudeProfile({
   });
 }
 
+/** Tolerance for accepting a quaternion as unit length. */
+const QUATERNION_UNIT_TOLERANCE = 1e-6;
+
+/**
+ * Validates a TRS transform, failing closed on anything this tranche does not
+ * correctly support.
+ *
+ * Mirroring is REFUSED rather than silently accepted. A negative scale flips
+ * triangle winding and inverts surface orientation; supporting it correctly
+ * means re-winding indices and re-deriving normals and anchor frames, which is
+ * work this tranche did not authorize. Silently producing inside-out geometry
+ * would be worse than refusing.
+ *
+ * @param {object} transform
+ * @returns {object} The validated transform.
+ */
+export function validateTransform({ translation, rotation, scale }) {
+  const finiteTriple = (value, name) => {
+    if (!Array.isArray(value) || value.length !== 3 || !value.every(Number.isFinite)) {
+      throw new TypeError(`transformMesh ${name} must be a finite [x, y, z]; received ${JSON.stringify(value)}`);
+    }
+  };
+
+  finiteTriple(translation, 'translation');
+  finiteTriple(scale, 'scale');
+
+  for (const component of scale) {
+    if (component === 0) {
+      throw new RangeError(
+        'transformMesh scale components must be non-zero. A zero scale collapses geometry to a ' +
+        'degenerate plane or line and destroys normals.'
+      );
+    }
+    if (component < 0) {
+      throw new RangeError(
+        'transformMesh refuses a negative scale. Mirroring flips triangle winding and surface ' +
+        'orientation, and correct mirroring (re-winding indices, re-deriving normals and anchor ' +
+        'frames) is out of scope for this tranche. Author the mirrored form directly instead.'
+      );
+    }
+  }
+
+  if (!Array.isArray(rotation) || rotation.length !== 4 || !rotation.every(Number.isFinite)) {
+    throw new TypeError(`transformMesh rotation must be a finite quaternion [x, y, z, w]; received ${JSON.stringify(rotation)}`);
+  }
+  const length = Math.hypot(...rotation);
+  if (Math.abs(length - 1) > QUATERNION_UNIT_TOLERANCE) {
+    throw new RangeError(
+      `transformMesh rotation must be a unit quaternion; |q| = ${length}. ` +
+      'A non-unit quaternion scales geometry as a side effect of rotating it, which would make ' +
+      'the transform silently lossy. Normalize it at the call site so the intent is explicit.'
+    );
+  }
+
+  return { translation, rotation, scale };
+}
+
 /**
  * Applies a TRS transform to a MeshIR, producing a new MeshIR.
  *
@@ -495,6 +552,7 @@ export function transformMesh(mesh, {
   rotation = [0, 0, 0, 1],
   scale = [1, 1, 1]
 } = {}) {
+  validateTransform({ translation, rotation, scale });
   const src = mesh.attributes.position;
   const positions = new Float32Array(src.length);
   const [qx, qy, qz, qw] = rotation;
@@ -583,6 +641,23 @@ export function mergeMeshIR(meshes, { id = 'merged' } = {}) {
         'mergeMeshIR refuses an input without position and indices. ' +
         'Inputs are never skipped silently: fix or remove the input.'
       );
+    }
+  }
+
+  // Coordinate conventions must agree. Silently inheriting the first input's
+  // units or axes would merge metres with centimetres, or +Y-up with +Z-up,
+  // into geometry that looks plausible and measures wrong — and every
+  // downstream measurement in the manifest would then be a confident lie.
+  const reference = meshes[0];
+  for (const mesh of meshes.slice(1)) {
+    for (const field of ['units', 'upAxis', 'forwardAxis']) {
+      if (mesh[field] !== reference[field]) {
+        throw new Error(
+          `mergeMeshIR refuses inputs with mismatched ${field}: ` +
+          `"${reference.id}" declares "${reference[field]}" but "${mesh.id}" declares "${mesh[field]}". ` +
+          'Convert explicitly rather than letting the first input define the result.'
+        );
+      }
     }
   }
 
@@ -691,9 +766,9 @@ export function mergeMeshIR(meshes, { id = 'merged' } = {}) {
     indices,
     parts,
     anchors,
-    units: meshes[0].units,
-    upAxis: meshes[0].upAxis,
-    forwardAxis: meshes[0].forwardAxis,
+    units: reference.units,
+    upAxis: reference.upAxis,
+    forwardAxis: reference.forwardAxis,
     diagnostics: mergedDiagnostics
   });
 }
@@ -705,68 +780,89 @@ export function mergeMeshIR(meshes, { id = 'merged' } = {}) {
  * shares one source of truth. A separately maintained API registry would drift
  * and is forbidden. See `Next step.md` Decision 5.
  */
+
+/** Parameters every single-part generator accepts, described once. */
+const COMMON_GENERATOR_PARAMS = Object.freeze({
+  semanticName: 'string, REQUIRED, non-empty. Becomes the part id and the name in every manifest measurement. Anonymous names such as "part_0" are refused.',
+  id: 'string or null, default null. Mesh id; defaults to "<kind>:<semanticName>".',
+  regionId: 'integer 0-65535, default 0. Per-vertex semantic region identity.',
+  surfaceId: 'integer 0-65535, default 0. Per-vertex semantic surface identity.',
+  materialId: 'string or null, default null. MaterialDefinition id; must be supplied to createPreviewable when set.',
+  anchors: 'array of SemanticAnchor, default []. Positions are in this mesh\'s local space and are transformed with it.'
+});
+
 export const MESH_OP_DESCRIPTORS = Object.freeze([
   Object.freeze({
     name: 'createBoxMesh',
-    summary: 'Axis-aligned box as a single named part.',
+    summary: 'Axis-aligned box as a single named part. 12 triangles across 24 split vertices.',
     params: Object.freeze({
-      width: 'number, metres, default 1',
-      height: 'number, metres, default 1',
-      depth: 'number, metres, default 1',
-      origin: '{x,y,z} centre position, metres',
-      semanticName: 'string, REQUIRED',
-      regionId: 'integer semantic region id',
-      surfaceId: 'integer semantic surface id',
-      materialId: 'string material definition id or null'
+      width: 'number, metres, default 1. Extent along X.',
+      height: 'number, metres, default 1. Extent along Y.',
+      depth: 'number, metres, default 1. Extent along Z.',
+      origin: '{x,y,z} metres, default {0,0,0}. The box CENTRE, not a corner.',
+      ...COMMON_GENERATOR_PARAMS
     }),
-    returns: 'MeshIR'
+    returns: 'MeshIR',
+    constraints: 'Throws TypeError when semanticName is missing or blank.'
   }),
   Object.freeze({
     name: 'createCylinderMesh',
-    summary: 'Cylinder or truncated cone as a single named part. origin.y is the base.',
+    summary: 'Cylinder or truncated cone as a single named part, extending along +Y from its base.',
     params: Object.freeze({
-      radiusTop: 'number, metres, default 0.5',
-      radiusBottom: 'number, metres, default 0.5',
-      height: 'number, metres, default 2',
-      radialSegments: 'integer, default 16',
-      origin: '{x,y,z} base centre position, metres',
-      semanticName: 'string, REQUIRED',
-      cappedBottom: 'boolean, default true'
+      radiusTop: 'number, metres, default 0.5.',
+      radiusBottom: 'number, metres, default 0.5. Differs from radiusTop to make a cone.',
+      height: 'number, metres, default 2. Extent along +Y.',
+      radialSegments: 'integer, default 16. Higher is rounder and costs triangles.',
+      origin: '{x,y,z} metres, default {0,0,0}. origin.y is the BASE, not the centre.',
+      cappedBottom: 'boolean, default true. Set false to leave the base open where it is hidden.',
+      ...COMMON_GENERATOR_PARAMS
     }),
-    returns: 'MeshIR'
+    returns: 'MeshIR',
+    constraints: 'Built along +Y. To point it along -Z (engine forward), transformMesh with a -90 degree rotation about X.'
   }),
   Object.freeze({
     name: 'extrudeProfile',
-    summary: 'Extrudes a 2D XY profile along +Z. Caps require a convex profile and fail closed otherwise.',
+    summary: 'Extrudes a 2D profile in the XY plane along Z into a single named part.',
     params: Object.freeze({
-      profile: 'array of [x,y] pairs, minimum 3, metres',
-      distance: 'number, metres, non-zero',
-      origin: '{x,y,z} offset, metres',
-      semanticName: 'string, REQUIRED',
-      capStart: 'boolean, default true',
-      capEnd: 'boolean, default true'
+      profile: 'array of [x,y] pairs, minimum 3, metres. Counter-clockwise; clockwise input is normalized and reported.',
+      distance: 'number, metres, non-zero, default 1. Negative distance is normalized to a positive extrusion from a lower z, and reported.',
+      origin: '{x,y,z} metres, default {0,0,0}. Profile offset; extrusion starts at origin.z.',
+      capStart: 'boolean, default true. Cap at the starting z.',
+      capEnd: 'boolean, default true. Cap at the ending z.',
+      ...COMMON_GENERATOR_PARAMS
     }),
     returns: 'MeshIR',
-    constraints: 'Non-convex profile with caps requested throws EXTRUDE_NON_CONVEX_CAP.'
+    constraints:
+      'Caps use fan triangulation and REQUIRE a convex profile. A non-convex profile with either cap requested throws ' +
+      'EXTRUDE_NON_CONVEX_CAP rather than emitting wrong geometry. Either set capStart and capEnd false, or compose the ' +
+      'shape from several convex extrusions and mergeMeshIR them.'
   }),
   Object.freeze({
     name: 'transformMesh',
-    summary: 'Applies translation, rotation and scale. Pure: the input mesh is not mutated. Anchors transform with the geometry.',
+    summary: 'Applies translation, rotation and scale, returning a new MeshIR. Pure: the input is never mutated. Anchors and part bounds move with the geometry.',
     params: Object.freeze({
-      mesh: 'MeshIR',
-      translation: '[x,y,z] metres, default [0,0,0]',
-      rotation: '[x,y,z,w] quaternion, default identity',
-      scale: '[x,y,z], default [1,1,1]'
+      mesh: 'MeshIR, required, positional first argument.',
+      translation: '[x,y,z] metres, finite, default [0,0,0].',
+      rotation: '[x,y,z,w] quaternion, finite and UNIT length, default [0,0,0,1].',
+      scale: '[x,y,z], finite and strictly positive, default [1,1,1].'
     }),
-    returns: 'MeshIR'
+    returns: 'MeshIR',
+    constraints:
+      'Rejects a non-unit quaternion (it would scale as a side effect of rotating), a zero scale component (collapses ' +
+      'geometry and destroys normals), and a NEGATIVE scale component. Mirroring is refused because it flips triangle ' +
+      'winding and surface orientation, and correct mirroring is out of scope for this tranche. Author the mirrored form directly.'
   }),
   Object.freeze({
     name: 'mergeMeshIR',
-    summary: 'Concatenates meshes, part tables and anchors. Never skips an input silently; refuses duplicate part ids, duplicate anchor names and anonymous parts.',
+    summary: 'Concatenates meshes, part tables and anchors into one MeshIR.',
     params: Object.freeze({
-      meshes: 'array of MeshIR, non-empty',
-      id: 'string id for the merged result'
+      meshes: 'array of MeshIR, non-empty, positional first argument.',
+      id: 'string, default "merged". Id for the merged result.'
     }),
-    returns: 'MeshIR'
+    returns: 'MeshIR',
+    constraints:
+      'Never skips an input silently. Refuses duplicate part ids, duplicate anchor names, anonymous parts, and inputs whose ' +
+      'units, upAxis or forwardAxis disagree. An optional attribute present on some inputs but not others is filled with a ' +
+      'declared default and reported as a MERGE_ATTRIBUTE_FILLED warning.'
   })
 ]);

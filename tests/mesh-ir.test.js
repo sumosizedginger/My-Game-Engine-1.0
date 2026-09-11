@@ -54,10 +54,31 @@ test('MeshIR validates a well-formed mesh', () => {
   assert.equal(diagnostics.length, 0);
 });
 
-test('MeshIR refuses a part with no semanticName', () => {
-  const mesh = quadMesh({
-    parts: [createPart({ id: 'face', semanticName: '', indexStart: 0, indexCount: 6 })]
-  });
+test('createPart refuses an anonymous part at the construction boundary', () => {
+  // The law is that anonymous parts are refused at EVERY entry point, not only
+  // in validation. Construction is an entry point.
+  assert.throws(() => createPart({ id: 'face', semanticName: '', indexStart: 0, indexCount: 6 }), /semanticName/);
+  assert.throws(() => createPart({ id: 'face', semanticName: '   ', indexStart: 0, indexCount: 6 }), /semanticName/);
+  assert.throws(() => createPart({ id: 'face', indexStart: 0, indexCount: 6 }), /semanticName/);
+  assert.throws(() => createPart({ id: '', semanticName: 'face', indexStart: 0, indexCount: 6 }), /string id/);
+  assert.throws(() => createPart({ id: 'a', semanticName: 'b', indexStart: -1, indexCount: 6 }), /indexStart/);
+  assert.throws(() => createPart({ id: 'a', semanticName: 'b', indexStart: 0, indexCount: 0 }), /indexCount/);
+});
+
+test('createMesh also refuses an anonymous part, since it constructs parts', () => {
+  assert.throws(
+    () => quadMesh({ parts: [{ id: 'face', semanticName: '', indexStart: 0, indexCount: 6 }] }),
+    /semanticName/
+  );
+});
+
+test('validateMesh still catches an anonymous part that bypassed construction', () => {
+  // A hand-built object can always reach validation without going through the
+  // constructor, so both boundaries must hold independently.
+  const mesh = {
+    ...quadMesh(),
+    parts: [{ id: 'face', semanticName: '', indexStart: 0, indexCount: 6, bounds: null }]
+  };
   const { valid, diagnostics } = validateMesh(mesh);
   assert.equal(valid, false);
   assert.ok(diagnostics.some((d) => d.code === 'MESH_PART_UNNAMED'));
@@ -123,14 +144,73 @@ test('MeshIR refuses duplicate anchor names', () => {
 });
 
 test('enforceValidMesh fails closed and attaches diagnostics', () => {
-  const mesh = quadMesh({
-    parts: [createPart({ id: 'face', semanticName: '', indexStart: 0, indexCount: 6 })]
-  });
+  const mesh = {
+    ...quadMesh(),
+    parts: [{ id: 'face', semanticName: '', indexStart: 0, indexCount: 6, bounds: null }]
+  };
   assert.throws(() => enforceValidMesh(mesh), (err) => {
     assert.ok(Array.isArray(err.diagnostics));
     assert.ok(err.message.includes('MESH_PART_UNNAMED'));
     return true;
   });
+});
+
+test('validateMesh returns diagnostics rather than throwing on malformed input', () => {
+  // validateMesh promises structured diagnostics. A caller handing it an
+  // arbitrary object must get diagnostics back, never a raw TypeError.
+  const cases = [
+    ['missing parts', { parts: undefined }, 'MESH_PARTS_INVALID'],
+    ['null parts', { parts: null }, 'MESH_PARTS_INVALID'],
+    ['parts not an array', { parts: { id: 'x' } }, 'MESH_PARTS_INVALID'],
+    ['empty parts', { parts: [] }, 'MESH_PARTS_EMPTY'],
+    ['null part record', { parts: [null] }, 'MESH_PART_INVALID'],
+    ['primitive part record', { parts: ['face'] }, 'MESH_PART_INVALID'],
+    ['part missing range', { parts: [{ id: 'a', semanticName: 'a' }] }, 'MESH_PART_RANGE'],
+    ['part with string range', { parts: [{ id: 'a', semanticName: 'a', indexStart: '0', indexCount: '6' }] }, 'MESH_PART_RANGE'],
+    ['anchors not an array', { anchors: { name: 'x' } }, 'MESH_ANCHORS_INVALID'],
+    ['null anchor record', { anchors: [null] }, 'ANCHOR_INVALID'],
+    ['primitive anchor record', { anchors: ['tip'] }, 'ANCHOR_INVALID']
+  ];
+
+  const base = quadMesh();
+  for (const [label, override, expectedCode] of cases) {
+    const malformed = { ...base, ...override };
+    let result;
+    assert.doesNotThrow(() => { result = validateMesh(malformed); }, `validateMesh threw for: ${label}`);
+    assert.equal(result.valid, false, label);
+    assert.ok(Array.isArray(result.diagnostics), label);
+    assert.ok(
+      result.diagnostics.some((d) => d.code === expectedCode),
+      `${label}: expected ${expectedCode}, got ${result.diagnostics.map((d) => d.code).join(', ')}`
+    );
+  }
+});
+
+test('validateMesh survives a completely foreign object', () => {
+  for (const value of [null, undefined, 42, 'mesh', [], {}, { attributes: {} }, { attributes: { position: 'nope' } }]) {
+    let result;
+    assert.doesNotThrow(() => { result = validateMesh(value); }, `threw for ${JSON.stringify(value)}`);
+    assert.equal(result.valid, false);
+    assert.ok(result.diagnostics.length > 0);
+  }
+});
+
+test('part bounds are derived, so false bounds cannot reach the manifest', () => {
+  const lie = createBounds([-999, -999, -999], [999, 999, 999]);
+  const mesh = createMesh({
+    id: 'liar',
+    attributes: {
+      position: Float32Array.from([0, 0, 0, 1, 0, 0, 1, 1, 0]),
+      normal: null, uv: null, regionId: null, surfaceId: null
+    },
+    indices: Uint32Array.from([0, 1, 2]),
+    parts: [{ id: 'tri', semanticName: 'tri', indexStart: 0, indexCount: 3, bounds: lie }]
+  });
+
+  // The supplied bounds are discarded and re-derived from the actual geometry.
+  assert.deepEqual([...mesh.parts[0].bounds.min], [0, 0, 0]);
+  assert.deepEqual([...mesh.parts[0].bounds.max], [1, 1, 0]);
+  assert.notDeepEqual([...mesh.parts[0].bounds.max], [...lie.max]);
 });
 
 test('part bounds are measured through the index range, not the vertex slice', () => {

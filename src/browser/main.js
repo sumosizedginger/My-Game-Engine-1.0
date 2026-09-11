@@ -34,8 +34,12 @@ const app = document.getElementById('app');
 if (params.has('preview')) {
   // AI-ASSET-FOUNDATION-001: human-visible preview of a generated asset.
   await import('./preview.css');
-  const { createPreviewViewer } = await import('./preview-viewer.js');
-  await createPreviewViewer(app, { asset: params.get('preview') || 'cinder' });
+  const { createPreviewViewer, recreatePreviewViewer } = await import('./preview-viewer.js');
+  const previewAsset = params.get('preview') || 'cinder';
+  await createPreviewViewer(app, { asset: previewAsset });
+  // Exposed so lifecycle evidence can run repeated create/dispose cycles in one
+  // page, rather than relying on a reload that proves nothing about cleanup.
+  window.__PREVIEW_RECREATE__ = () => recreatePreviewViewer(app, { asset: previewAsset });
 } else if (params.get('game') === 'sequence') {
   const { createSequenceViewer } = await import('./sequence-viewer.js');
   createSequenceViewer(app, { controlled: isControlled });

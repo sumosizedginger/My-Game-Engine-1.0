@@ -5,7 +5,7 @@ import { createServer } from 'vite';
 import { findBrowserExecutable } from '../src/eval/browser.js';
 import { CANONICAL_VIEWS } from '../src/preview/views.js';
 import { buildCinder } from '../examples/authoring/cinder-mk1/build.js';
-import { meshHash } from '../src/geometry/mesh-codec.js';
+import { meshHash, encodeMesh, bytesToHex } from '../src/geometry/mesh-codec.js';
 import { diffHexRanges } from '../src/eval/probe-cinder.js';
 
 /**
@@ -105,22 +105,37 @@ test('Preview Lab renders CINDER, honours canonical views, stays idle and dispos
         `manifest viewport ${JSON.stringify(match.viewport)} must match surface ${JSON.stringify(match.surface)}`);
     });
 
-    await t.test('the browser build matches the Node build byte for byte', async () => {
-      // Cross-runtime determinism probe. Decision 8: evidence, not assumption.
-      const nodeHash = meshHash(buildCinder().meshIR);
+    await t.test('the browser build matches the Node build BYTE FOR BYTE', async () => {
+      // Cross-runtime determinism. Decision 8: evidence, not assumption.
+      //
+      // The bytes are compared directly. Equal hashes plus equal lengths would
+      // NOT be byte identity: meshHash is a 64-bit non-cryptographic
+      // fingerprint, which names a byte stream rather than proving two streams
+      // are the same one.
+      const nodeMesh = buildCinder().meshIR;
+      const nodeBytes = encodeMesh(nodeMesh);
+      const nodeHex = bytesToHex(nodeBytes);
+      const nodeHash = meshHash(nodeMesh);
+
       const browserSide = await page.evaluate(() => ({
         hash: window.__PREVIEW_LAB__.meshHash,
-        bytes: window.__PREVIEW_LAB__.meshByteLength
+        bytes: window.__PREVIEW_LAB__.meshByteLength,
+        hex: window.__PREVIEW_LAB__.getMeshBytesHex()
       }));
-      if (nodeHash !== browserSide.hash) {
-        const browserHex = await page.evaluate(() => window.__PREVIEW_LAB__.getMeshBytesHex());
-        const { bytesToHex, encodeMesh } = await import('../src/geometry/mesh-codec.js');
-        const ranges = diffHexRanges(bytesToHex(encodeMesh(buildCinder().meshIR)), browserHex, 4);
+
+      assert.equal(browserSide.bytes, nodeBytes.length,
+        `byte length differs: node ${nodeBytes.length}, browser ${browserSide.bytes}`);
+
+      if (nodeHex !== browserSide.hex) {
+        const ranges = diffHexRanges(nodeHex, browserSide.hex, 4);
         assert.fail(
           'STOP CONDITION: canonical MeshIR bytes diverge between Node and browser. ' +
           `node=${nodeHash} browser=${browserSide.hash}. Differing ranges: ${JSON.stringify(ranges)}`
         );
       }
+
+      assert.equal(nodeHex, browserSide.hex, 'canonical bytes must be identical');
+      // The fingerprint agreeing is a consequence, not the proof.
       assert.equal(nodeHash, browserSide.hash);
     });
 
@@ -193,6 +208,111 @@ test('Preview Lab renders CINDER, honours canonical views, stays idle and dispos
       await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 });
     });
 
+    await t.test('repeated create/dispose cycles in ONE page leak nothing', async () => {
+      // The lifecycle proof. A reload cannot demonstrate cleanup: it discards
+      // the whole JavaScript world, so it shows only that the page can boot
+      // twice. These cycles stay in one page, so anything dispose failed to
+      // release accumulates and is visible.
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForFunction(() => Boolean(window.__PREVIEW_LAB__) && Boolean(window.__PREVIEW_RECREATE__), { timeout: 20000 });
+
+      const cycles = await page.evaluate(async () => {
+        const settle = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const sample = () => {
+          const handle = window.__PREVIEW_LAB__;
+          const stats = handle.getStats();
+          return {
+            liveLabs: handle.liveLabs,
+            canvases: document.querySelectorAll('#preview-stage canvas').length,
+            allCanvases: document.querySelectorAll('canvas').length,
+            geometries: stats.geometriesInMemory,
+            textures: stats.texturesInMemory,
+            drawCalls: stats.drawCalls,
+            predictedDrawCalls: stats.predictedDrawCalls,
+            meshHash: handle.meshHash,
+            frameScheduled: handle.frameScheduled
+          };
+        };
+
+        const observations = [];
+        const disposedStates = [];
+
+        await settle();
+        observations.push(sample());
+
+        for (let i = 0; i < 4; i++) {
+          const previous = window.__PREVIEW_LAB__;
+          await window.__PREVIEW_RECREATE__();
+          disposedStates.push(previous.disposed);
+          await settle();
+          // Render again, so each cycle genuinely creates, renders and disposes.
+          window.__PREVIEW_LAB__.setView(i % 2 === 0 ? 'front' : 'threeQuarter');
+          await settle();
+          observations.push(sample());
+        }
+
+        const final = window.__PREVIEW_LAB__;
+        final.dispose();
+        await settle();
+
+        return {
+          observations,
+          disposedStates,
+          liveLabsAfterFinalDispose: final.liveLabs,
+          canvasesAfterFinalDispose: document.querySelectorAll('canvas').length
+        };
+      });
+
+      // Every superseded lab was actually disposed.
+      assert.deepEqual(cycles.disposedStates, [true, true, true, true], 'each cycle must dispose its predecessor');
+
+      for (const [i, obs] of cycles.observations.entries()) {
+        assert.equal(obs.liveLabs, 1, `cycle ${i}: exactly one live lab, saw ${obs.liveLabs}`);
+        assert.equal(obs.canvases, 1, `cycle ${i}: exactly one canvas in the stage, saw ${obs.canvases}`);
+        assert.equal(obs.allCanvases, 1, `cycle ${i}: exactly one canvas in the document, saw ${obs.allCanvases}`);
+        assert.equal(obs.frameScheduled, false, `cycle ${i}: no RAF held while idle`);
+        assert.ok(obs.drawCalls > 0, `cycle ${i}: rendered`);
+        assert.equal(obs.drawCalls, obs.predictedDrawCalls,
+          `cycle ${i}: predicted draw calls ${obs.predictedDrawCalls} must match measured ${obs.drawCalls}`);
+        assert.equal(obs.meshHash, cycles.observations[0].meshHash, `cycle ${i}: identity stable across cycles`);
+      }
+
+      // Resource counts must not climb with cycle number.
+      const geometries = cycles.observations.map((o) => o.geometries);
+      const textures = cycles.observations.map((o) => o.textures);
+      assert.ok(Math.max(...geometries) <= geometries[0],
+        `geometries leaked across cycles: ${geometries.join(' -> ')}`);
+      assert.ok(Math.max(...textures) <= textures[0],
+        `textures leaked across cycles: ${textures.join(' -> ')}`);
+
+      assert.equal(cycles.liveLabsAfterFinalDispose, 0, 'no lab may remain live after the final dispose');
+      assert.equal(cycles.canvasesAfterFinalDispose, 0, 'no canvas may remain in the document after dispose');
+    });
+
+    await t.test('a disposed handle stays inert and does not resurrect itself', async () => {
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForFunction(() => Boolean(window.__PREVIEW_LAB__), { timeout: 20000 });
+      const result = await page.evaluate(async () => {
+        const handle = window.__PREVIEW_LAB__;
+        handle.dispose();
+        const setViewThrew = (() => {
+          try { handle.setView('front'); return false; } catch { return true; }
+        })();
+        handle.lab.requestRender();
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        return {
+          setViewThrew,
+          frameScheduled: handle.frameScheduled,
+          stats: handle.getStats(),
+          liveLabs: handle.liveLabs
+        };
+      });
+      assert.equal(result.setViewThrew, true, 'a disposed lab must refuse a view change');
+      assert.equal(result.frameScheduled, false, 'a disposed lab must not schedule frames');
+      assert.equal(result.stats, null);
+      assert.equal(result.liveLabs, 0);
+    });
+
     await t.test('dispose releases GPU resources and is idempotent', async () => {
       await page.reload({ waitUntil: 'load' });
       await page.waitForFunction(() => Boolean(window.__PREVIEW_LAB__), { timeout: 20000 });
@@ -217,7 +337,7 @@ test('Preview Lab renders CINDER, honours canonical views, stays idle and dispos
       assert.equal(result.statsAfterDispose, null, 'a disposed lab reports no stats');
     });
 
-    await t.test('recreate after dispose works, proving no leaked global state', async () => {
+    await t.test('reload after dispose also works (supplementary, not the lifecycle proof)', async () => {
       await page.reload({ waitUntil: 'load' });
       await page.waitForFunction(() => Boolean(window.__PREVIEW_LAB__), { timeout: 20000 });
       const second = await page.evaluate(() => ({

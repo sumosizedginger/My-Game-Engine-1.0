@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 import * as fullModule from '../src/full/index.js';
 import { AUTHORING_SURFACE } from '../src/full/authoring.js';
@@ -18,6 +19,46 @@ import { MESH_IR_VERSION } from '../src/geometry/mesh.js';
  * and drift in this descriptor is worse than having no descriptor at all.
  */
 
+/**
+ * Extracts the option names a destructured signature declares.
+ *
+ * Splits on commas at the outer destructuring depth only, so default values
+ * that are themselves objects (such as `origin = { x: 0, y: 0, z: 0 }`) do not
+ * contribute their own keys.
+ *
+ * @param {string} signatureText
+ * @returns {Array<string>}
+ */
+function declaredParameters(signatureText) {
+  const names = [];
+  let depth = 0;
+  let current = '';
+
+  const flush = () => {
+    const match = current.trim().match(/^([A-Za-z_$][\w$]*)/);
+    if (match) names.push(match[1]);
+    current = '';
+  };
+
+  for (const char of signatureText) {
+    if (char === '{' || char === '[' || char === '(') {
+      depth += 1;
+      if (depth === 1) continue;
+    } else if (char === '}' || char === ']' || char === ')') {
+      if (depth === 1) { flush(); depth -= 1; continue; }
+      depth -= 1;
+    } else if (char === ',' && depth === 1) {
+      flush();
+      continue;
+    }
+    if (depth >= 1) current += char;
+  }
+  flush();
+
+  // Drop the trailing `= {}` default of the options object itself.
+  return names.filter((name) => name.length > 0);
+}
+
 test('every described operation is actually exported', () => {
   for (const descriptor of AUTHORING_SURFACE.operations) {
     assert.equal(
@@ -33,6 +74,57 @@ test('every exported modeling verb is described', () => {
   for (const verb of ['createBoxMesh', 'createCylinderMesh', 'extrudeProfile', 'transformMesh', 'mergeMeshIR']) {
     assert.ok(described.has(verb), `exported verb "${verb}" is undescribed; an agent cannot discover it`);
   }
+});
+
+test('every descriptor documents every parameter the function actually accepts', () => {
+  // Anti-drift. A descriptor that omits a parameter is worse than no
+  // descriptor: an agent reads it as the complete surface and never discovers
+  // the option it needed. Signatures are read from source, so adding a
+  // parameter without describing it fails here.
+  const source = fs.readFileSync(new URL('../src/geometry/mesh-ops.js', import.meta.url), 'utf8');
+
+  // Parameters that are positional rather than destructured options.
+  const POSITIONAL = { transformMesh: ['mesh'], mergeMeshIR: ['meshes'] };
+
+  for (const descriptor of AUTHORING_SURFACE.operations) {
+    const signature = source.match(
+      new RegExp(`export function ${descriptor.name}\\(([\\s\\S]*?)\\)\\s*\\{`)
+    );
+    assert.ok(signature, `could not read the signature of ${descriptor.name}`);
+
+    const expected = new Set([...(POSITIONAL[descriptor.name] ?? []), ...declaredParameters(signature[1])]);
+    const described = new Set(Object.keys(descriptor.params));
+
+    for (const name of expected) {
+      assert.ok(described.has(name),
+        `${descriptor.name} accepts "${name}" but the descriptor does not document it`);
+    }
+    for (const name of described) {
+      assert.ok(expected.has(name),
+        `${descriptor.name} descriptor documents "${name}", which the function does not accept`);
+    }
+  }
+});
+
+test('every descriptor states units and defaults an agent needs to call it', () => {
+  for (const descriptor of AUTHORING_SURFACE.operations) {
+    for (const [param, text] of Object.entries(descriptor.params)) {
+      assert.ok(text.length > 12, `${descriptor.name}.${param} needs a real description`);
+    }
+    assert.ok(descriptor.constraints && descriptor.constraints.length > 20,
+      `${descriptor.name} must state its constraints`);
+  }
+});
+
+test('descriptors state the refusals that would otherwise surprise an agent', () => {
+  const byName = Object.fromEntries(AUTHORING_SURFACE.operations.map((d) => [d.name, d]));
+  assert.match(byName.extrudeProfile.constraints, /convex/);
+  assert.match(byName.transformMesh.constraints, /unit quaternion/);
+  assert.match(byName.transformMesh.constraints, /NEGATIVE scale|Mirroring/);
+  assert.match(byName.mergeMeshIR.constraints, /units, upAxis or forwardAxis/);
+  assert.match(byName.createCylinderMesh.constraints, /\+Y/);
+  assert.match(byName.createBoxMesh.params.origin, /CENTRE|centre/);
+  assert.match(byName.createCylinderMesh.params.origin, /BASE|base/);
 });
 
 test('the descriptor shares the operation objects rather than copying them', () => {

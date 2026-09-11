@@ -17,6 +17,7 @@ import {
   encodeMesh,
   CANONICAL_VIEWS
 } from '../full/index.js';
+import { livePreviewLabCount } from '../preview/lab.js';
 
 /** Assets reachable through this route. */
 const ASSET_LOADERS = {
@@ -145,6 +146,8 @@ export async function createPreviewViewer(root, { asset = 'cinder' } = {}) {
     cameraTarget: camera.target,
     up: camera.up,
     fovDeg: camera.fovDeg,
+    aspect: camera.aspect,
+    occupancy: camera.occupancy,
     viewport: { width: surface.width, height: surface.height }
   }));
 
@@ -173,6 +176,12 @@ export async function createPreviewViewer(root, { asset = 'cinder' } = {}) {
 
     getStats: () => lab.getStats(),
     getParts: () => lab.getParts(),
+    getDiagnostics: () => [...previewable.diagnostics, ...lab.getDiagnostics()],
+
+    /** Live Preview Lab instances. Must return to zero after dispose. */
+    get liveLabs() {
+      return livePreviewLabCount();
+    },
 
     /**
      * Canonical MeshIR bytes as hex, for the cross-runtime determinism probe.
@@ -207,4 +216,27 @@ export async function createPreviewViewer(root, { asset = 'cinder' } = {}) {
 
   window.__PREVIEW_LAB__ = handle;
   return handle;
+}
+
+/**
+ * Disposes the mounted preview and builds a fresh one in the SAME page.
+ *
+ * Lifecycle correctness has to be provable without a reload. A reload discards
+ * the entire JavaScript world, so it proves only that the page can boot twice —
+ * it cannot show whether dispose released listeners, canvases and GPU
+ * resources. Repeated in-page cycles can.
+ *
+ * @param {HTMLElement} root
+ * @param {object} [options]
+ * @returns {Promise<object>} The new preview handle.
+ */
+export async function recreatePreviewViewer(root, options = {}) {
+  const existing = window.__PREVIEW_LAB__;
+  if (existing && !existing.disposed) {
+    existing.dispose();
+  }
+  window.__PREVIEW_LAB__ = null;
+  root.classList.remove('preview-host');
+  root.innerHTML = '';
+  return createPreviewViewer(root, options);
 }

@@ -38,15 +38,37 @@ export const PREVIEW_BUDGET_DEFAULTS = Object.freeze({
   maxGenerationMs: 2000
 });
 
-/** Human-readable stat labels used in violation messages. */
-const LIMIT_TO_STAT = Object.freeze({
+/**
+ * Limits that FAIL CLOSED. Exceeding one refuses the preview outright.
+ *
+ * `maxDrawCalls` is checked against a PREDICTED draw-call count, not a measured
+ * one, because the check must happen before any renderer resource is allocated.
+ * The prediction is sound for the current architecture — a Previewable is one
+ * Mesh carrying one geometry group per part, and a renderer issues one draw
+ * call per group — and `tests/preview-browser.test.js` asserts the prediction
+ * matches the renderer's own measured count. If that architecture ever changes
+ * to multiple meshes or instancing, the prediction must be revisited.
+ */
+export const FAIL_CLOSED_LIMITS = Object.freeze({
   maxTriangles: 'triangles',
   maxVertices: 'vertices',
   maxParts: 'parts',
   maxMaterials: 'materials',
   maxDrawCalls: 'drawCalls',
-  maxDpr: 'dpr',
   maxGenerationMs: 'generationMs'
+});
+
+/**
+ * Limits applied as explicit safe DEGRADATION rather than refusal.
+ *
+ * `maxDpr` is a clamp: a high-density display does not make an asset
+ * pathological, it just makes it expensive to rasterize, so the correct
+ * response is to render at a bounded pixel ratio and SAY SO. The clamp is
+ * reported through a diagnostic carrying both the requested and effective
+ * value; it is never silent, and it is never advertised as fail-closed.
+ */
+export const DEGRADATION_LIMITS = Object.freeze({
+  maxDpr: 'dpr'
 });
 
 /**
@@ -62,7 +84,7 @@ const LIMIT_TO_STAT = Object.freeze({
 export function evaluatePreviewBudget(stats, budget = PREVIEW_BUDGET_DEFAULTS) {
   const violations = [];
 
-  for (const [limitName, statName] of Object.entries(LIMIT_TO_STAT)) {
+  for (const [limitName, statName] of Object.entries(FAIL_CLOSED_LIMITS)) {
     const limit = budget[limitName];
     const measured = stats[statName];
     if (limit === undefined || measured === undefined || measured === null) continue;
@@ -93,7 +115,42 @@ export function evaluatePreviewBudget(stats, budget = PREVIEW_BUDGET_DEFAULTS) {
     withinBudget: violations.length === 0,
     violations,
     budget,
+    failClosedDimensions: Object.keys(FAIL_CLOSED_LIMITS),
+    degradationDimensions: Object.keys(DEGRADATION_LIMITS),
     stats: { ...stats }
+  };
+}
+
+/**
+ * Applies the device-pixel-ratio clamp and reports it.
+ *
+ * Returns both the requested and the effective value plus a diagnostic when a
+ * clamp actually occurred, so degradation is always visible in evidence rather
+ * than inferred from a surprising pixel count.
+ *
+ * @param {number} requestedDpr
+ * @param {object} [budget=PREVIEW_BUDGET_DEFAULTS]
+ * @returns {{requestedDpr: number, effectiveDpr: number, clamped: boolean, diagnostic: object|null}}
+ */
+export function resolveDevicePixelRatio(requestedDpr, budget = PREVIEW_BUDGET_DEFAULTS) {
+  const requested = Number.isFinite(requestedDpr) && requestedDpr > 0 ? requestedDpr : 1;
+  const effective = Math.min(requested, budget.maxDpr);
+  const clamped = effective < requested;
+
+  return {
+    requestedDpr: requested,
+    effectiveDpr: effective,
+    clamped,
+    diagnostic: clamped
+      ? createDiagnostic({
+        severity: 'INFO',
+        code: 'PREVIEW_DPR_CLAMPED',
+        step: 'budget',
+        subsystem: 'preview',
+        message: `Device pixel ratio clamped from ${requested} to ${effective} by the preview budget`,
+        data: { requestedDpr: requested, effectiveDpr: effective, maxDpr: budget.maxDpr }
+      })
+      : null
   };
 }
 

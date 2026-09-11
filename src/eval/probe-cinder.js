@@ -84,16 +84,27 @@ export async function probeCinderDeterminism({ baseUrl = 'http://localhost:5173'
     await page.goto(url, { waitUntil: 'load', timeout: 20000 });
     await page.waitForFunction(() => Boolean(window.__PREVIEW_LAB__), { timeout: 20000 });
 
+    // ALWAYS pull the full canonical byte stream and compare it directly.
+    //
+    // Equal hashes plus equal lengths is NOT byte identity. meshHash is a
+    // 64-bit non-cryptographic fingerprint: a compact way to NAME a byte
+    // stream, never proof that two streams are the same one. The contract is
+    // strict byte equality, so bytes are what gets compared.
     const browserSide = await page.evaluate(() => ({
       meshHash: window.__PREVIEW_LAB__.meshHash,
       byteLength: window.__PREVIEW_LAB__.meshByteLength,
+      hex: window.__PREVIEW_LAB__.getMeshBytesHex(),
       userAgent: navigator.userAgent
     }));
 
-    const identical = nodeHash === browserSide.meshHash && nodeBytes.length === browserSide.byteLength;
+    const nodeHex = bytesToHex(nodeBytes);
+    const identical = nodeHex === browserSide.hex;
+    const hashesAgree = nodeHash === browserSide.meshHash;
 
     const result = {
       identical,
+      comparison: 'byte-for-byte over the canonical MeshIR encoding',
+      bytesCompared: nodeBytes.length,
       node: {
         hash: nodeHash,
         byteLength: nodeBytes.length,
@@ -104,14 +115,16 @@ export async function probeCinderDeterminism({ baseUrl = 'http://localhost:5173'
         byteLength: browserSide.byteLength,
         runtime: browserSide.userAgent
       },
+      // Reported separately, so a fingerprint agreeing while the bytes differ
+      // would surface as its own finding rather than passing silently.
+      hashesAgree,
+      hashAgreesButBytesDiffer: hashesAgree && !identical,
       divergence: null
     };
 
     if (!identical) {
-      // Only pull the full payload when there is something to investigate.
-      const browserHex = await page.evaluate(() => window.__PREVIEW_LAB__.getMeshBytesHex());
       result.divergence = {
-        ranges: diffHexRanges(bytesToHex(nodeBytes), browserHex),
+        ranges: diffHexRanges(nodeHex, browserSide.hex),
         likelySource:
           'Transcendental results (Math.sin / Math.cos in createCylinderMesh and profile generation) ' +
           'are not bit-pinned across engine builds. Compare the differing byte offsets against the ' +

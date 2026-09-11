@@ -12,8 +12,10 @@
  * shared; the capture driver is not.
  *
  * Determinism, per Decision 2: the manifest is compared byte-for-byte; rendered
- * images are compared by tolerance. Portable PNG byte identity is not a
- * reliable graphics contract and is not claimed here.
+ * images are compared as DECODED PIXELS against an explicit numeric threshold.
+ * Portable PNG byte identity is not a reliable graphics contract and is not
+ * claimed here, and compressed file size is never used as a stand-in for
+ * visual similarity.
  */
 
 import fs from 'node:fs';
@@ -22,6 +24,8 @@ import puppeteer from 'puppeteer-core';
 import { findBrowserExecutable } from './browser.js';
 import { CANONICAL_VIEWS } from '../preview/views.js';
 import { hashBytes } from '../geometry/mesh-codec.js';
+import { getRevisionInfo } from './revision.js';
+import { decodePng, compareImageBuffers, IMAGE_COMPARISON_DEFAULTS } from './png.js';
 
 /**
  * Captures every canonical view of a previewable asset from a running dev
@@ -70,7 +74,13 @@ export async function renderCanonicalViews({
 
     await page.waitForFunction(() => Boolean(window.__PREVIEW_LAB__), { timeout });
 
-    const environment = await page.evaluate(() => {
+    const revision = getRevisionInfo();
+
+    // Environment metadata describes the ACTUAL render, not what was requested.
+    // The recorded surface size is the canvas Preview Lab really rendered into
+    // and the recorded DPR is the value left after the budget clamp, so the
+    // camera aspect in the manifest corresponds to the pixels captured.
+    const pageEnvironment = await page.evaluate(() => {
       const canvas = document.querySelector('#preview-stage canvas');
       const gl = canvas?.getContext('webgl2') || canvas?.getContext('webgl');
       let rendererBackend = 'unknown';
@@ -78,14 +88,30 @@ export async function renderCanonicalViews({
         const info = gl.getExtension('WEBGL_debug_renderer_info');
         rendererBackend = info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : 'webgl';
       }
+      const stats = window.__PREVIEW_LAB__.getStats();
       return {
         userAgent: navigator.userAgent,
         rendererBackend,
-        dpr: window.devicePixelRatio || 1,
-        viewportWidth: window.innerWidth,
-        viewportHeight: window.innerHeight
+        windowDevicePixelRatio: window.devicePixelRatio || 1,
+        requestedDpr: stats.requestedDpr,
+        effectiveDpr: stats.effectiveDpr,
+        dprClamped: stats.dprClamped,
+        surfaceWidth: stats.surfaceWidth,
+        surfaceHeight: stats.surfaceHeight,
+        drawingBufferWidth: stats.drawingBufferWidth,
+        drawingBufferHeight: stats.drawingBufferHeight,
+        cssViewportWidth: window.innerWidth,
+        cssViewportHeight: window.innerHeight
       };
     });
+
+    const environment = {
+      ...pageEnvironment,
+      engineRevision: revision.commit,
+      engineBranch: revision.branch,
+      engineWorktreeClean: revision.clean,
+      nodeVersion: process.version
+    };
 
     const identity = await page.evaluate(() => ({
       meshHash: window.__PREVIEW_LAB__.meshHash,
@@ -119,16 +145,31 @@ export async function renderCanonicalViews({
       const imagePath = path.join(outputDir, `${asset}_${view}.png`);
       if (writeFiles) fs.writeFileSync(imagePath, buffer);
 
+      // Dimensions come from the captured image itself, so the recorded
+      // viewport can never drift from the pixels on disk.
+      const decoded = decodePng(buffer);
+
       captures.push({
         name: view,
         cameraPosition: camera?.cameraPosition ?? null,
         cameraTarget: camera?.cameraTarget ?? null,
         up: camera?.up ?? null,
         fovDeg: camera?.fovDeg ?? null,
-        viewport: { width: viewport.width, height: viewport.height },
+        aspect: camera?.aspect ?? null,
+        occupancy: camera?.occupancy ?? null,
+        // The ACTUAL captured surface, in device pixels and CSS pixels.
+        viewport: { width: decoded.width, height: decoded.height },
+        surface: {
+          cssWidth: environment.surfaceWidth,
+          cssHeight: environment.surfaceHeight,
+          devicePixelWidth: decoded.width,
+          devicePixelHeight: decoded.height,
+          effectiveDpr: environment.effectiveDpr
+        },
         environment,
         imagePath: writeFiles ? imagePath.replace(/\\/g, '/') : null,
-        // Same-environment supplementary evidence only. NOT a portable contract.
+        // Same-environment supplementary evidence only. NOT a portable contract
+        // and NOT the comparison: see compareCaptureReports.
         imageHash: hashBytes(new Uint8Array(buffer)),
         imageBytes: buffer.length
       });
@@ -148,10 +189,33 @@ export async function renderCanonicalViews({
       return { disposed: afterFirst, doubleDisposeThrew: false };
     }).catch((err) => ({ disposed: false, doubleDisposeThrew: true, error: String(err) }));
 
+    // Two manifests, deliberately.
+    //
+    // The STRUCTURAL manifest is what the page produced: asset identity and
+    // measurement only. It must be byte-identical across runs and machines, so
+    // machine-specific facts are kept out of it entirely.
+    //
+    // The CAPTURE manifest is the structural one enriched with the evidence
+    // context Decision 2 requires — engine revision, renderer backend, DPR,
+    // actual surface size, image paths. That context legitimately differs
+    // between machines, which is exactly why it cannot live in the artifact
+    // whose identity must not.
+    const structural = JSON.parse(identity.manifestJson);
+    const captureManifest = {
+      ...structural,
+      capturedAt: new Date().toISOString(),
+      environment,
+      captures: structural.captures.map((planned) => {
+        const actual = captures.find((c) => c.name === planned.name);
+        return actual ? { ...planned, ...actual } : planned;
+      })
+    };
+
     const report = {
       asset,
       url,
       httpStatus,
+      captureManifest,
       environment,
       meshHash: identity.meshHash,
       manifestHash: identity.manifestHash,
@@ -172,8 +236,12 @@ export async function renderCanonicalViews({
         identity.manifestJson
       );
       fs.writeFileSync(
+        path.join(outputDir, `${asset}_capture_manifest.json`),
+        JSON.stringify(captureManifest, null, 2)
+      );
+      fs.writeFileSync(
         path.join(outputDir, `${asset}_capture_report.json`),
-        JSON.stringify({ ...report, manifestJson: undefined }, null, 2)
+        JSON.stringify({ ...report, manifestJson: undefined, captureManifest: undefined }, null, 2)
       );
     }
 
@@ -186,17 +254,21 @@ export async function renderCanonicalViews({
 /**
  * Compares two capture reports of the same asset.
  *
- * Structural evidence is compared strictly. Images are compared by byte size
- * within a tolerance, because portable PNG byte identity is not a reliable
- * contract across GPU vendors, drivers and browser builds.
+ * Structural evidence is compared strictly, byte for byte. Images are compared
+ * as DECODED PIXELS with explicit numeric metrics and an explicit threshold.
+ *
+ * Image hashes are retained only as supplementary same-environment evidence.
+ * They are not the comparison: a hash tells you two files differ, never by how
+ * much or whether it matters. Compressed byte size is not used at all, because
+ * it carries no information about what an image looks like.
  *
  * @param {object} a
  * @param {object} b
  * @param {object} [options]
- * @param {number} [options.imageSizeTolerance=0.02] - Fractional byte-size tolerance.
+ * @param {object} [options.thresholds=IMAGE_COMPARISON_DEFAULTS]
  * @returns {object} Comparison result.
  */
-export function compareCaptureReports(a, b, { imageSizeTolerance = 0.02 } = {}) {
+export function compareCaptureReports(a, b, { thresholds = IMAGE_COMPARISON_DEFAULTS } = {}) {
   const findings = [];
 
   if (a.meshHash !== b.meshHash) {
@@ -216,13 +288,22 @@ export function compareCaptureReports(a, b, { imageSizeTolerance = 0.02 } = {}) 
       findings.push({ kind: 'STRICT', field: `captures.${capA.name}`, a: 'present', b: 'missing' });
       continue;
     }
-    const larger = Math.max(capA.imageBytes, capB.imageBytes) || 1;
-    const delta = Math.abs(capA.imageBytes - capB.imageBytes) / larger;
+    if (!capA.imagePath || !capB.imagePath) {
+      findings.push({ kind: 'STRICT', field: `captures.${capA.name}.imagePath`, a: capA.imagePath, b: capB.imagePath });
+      continue;
+    }
+
+    const pixels = compareImageBuffers(
+      fs.readFileSync(capA.imagePath),
+      fs.readFileSync(capB.imagePath),
+      thresholds
+    );
+
     imageComparisons.push({
       name: capA.name,
-      byteDelta: delta,
-      identicalHash: capA.imageHash === capB.imageHash,
-      withinTolerance: delta <= imageSizeTolerance
+      ...pixels,
+      // Supplementary, same-environment only. Never the contract.
+      identicalHash: capA.imageHash === capB.imageHash
     });
   }
 
@@ -230,6 +311,6 @@ export function compareCaptureReports(a, b, { imageSizeTolerance = 0.02 } = {}) 
     structurallyIdentical: findings.length === 0,
     findings,
     imageComparisons,
-    imagesWithinTolerance: imageComparisons.every((c) => c.withinTolerance)
+    imagesWithinThreshold: imageComparisons.every((c) => c.withinThreshold)
   };
 }
