@@ -28,20 +28,48 @@ const rootDir = path.resolve(__dirname, '..');
  * engine/runtime purity is unchanged and still absolute.
  */
 
-/** Systems that remain unearned at any public entry point. */
-const UNEARNED_SYSTEMS = [
-  'Kiln', 'kiln',
-  'GeometryForge', 'CharacterForge', 'MotionForge', 'MaterialForge', 'WorldForge', 'SkeletonForge'
+/**
+ * POLICY EXTENSION — PUBLIC-SURFACE-001.
+ *
+ * Geometry room generation, Character Forge, Motion Forge and World Forge are
+ * now reachable through engine/full. They were implemented and accepted long
+ * before; only the ROUTE is new. The allowlist below grew deliberately, and the
+ * exclusion tests grew with it.
+ *
+ * Two separate guards, because they protect different things.
+ */
+
+/** Systems with no implementation at all. Absent everywhere, by definition. */
+const UNEARNED_SYSTEMS = ['Kiln', 'kiln', 'SkeletonForge'];
+
+/**
+ * Namespace-object names the public surface deliberately does NOT use.
+ *
+ * The Forges ARE public now, as flat named exports. These names stay free so a
+ * future change cannot quietly add a second way to reach the same capability:
+ * two routes to one thing is two contracts, and they drift.
+ */
+const FORBIDDEN_NAMESPACE_NAMES = [
+  'GeometryForge', 'CharacterForge', 'MotionForge', 'MaterialForge', 'WorldForge'
 ];
 
 /** Everything engine/runtime must never expose. */
 const RUNTIME_FORBIDDEN = [
   ...UNEARNED_SYSTEMS,
+  ...FORBIDDEN_NAMESPACE_NAMES,
   'compile', 'compileDefinition', 'createMesh', 'createBoxMesh', 'createPreviewable',
   // Scene AUTHORING and COMPILATION belong to engine/full. An exported game
   // instantiates compiled scenes; it does not carry the scene compiler.
   'compileScene', 'createSceneDefinition', 'createSceneNode',
-  'validateSceneDefinition', 'encodeScene', 'decodeScene'
+  'validateSceneDefinition', 'encodeScene', 'decodeScene',
+  // Forge GENERATION belongs to engine/full too. A shipped game plays compiled
+  // content; it does not carry the generators that produced it. PUBLIC-SURFACE-001
+  // widened engine/full, not engine/runtime.
+  'generateProceduralRoom', 'createRoomDefinition', 'ROOM_PRESETS',
+  'buildHumanoidCharacter', 'createCharacterDefinition', 'HUMANOID_PRESETS',
+  'createLocomotionEvaluator', 'createMotionDefinition', 'MOTION_PRESETS',
+  'generateWorld', 'createWorldRecipe', 'createWorldFieldQuery',
+  'createMaterialDefinition', 'MATERIAL_PRESETS'
 ];
 
 /**
@@ -88,8 +116,57 @@ const ALLOWED_FULL_ADDITIONS = new Set([
   'SCENE_CODEC_VERSION', 'SCENE_CODEC_MAGIC', 'encodeScene', 'decodeScene', 'sceneHash',
   'SCENE_ARTIFACT_VERSION', 'compileScene',
   'identityMatrix', 'matrixFromTRS', 'multiplyMatrices', 'transformPoint',
-  'translationOf', 'hasShear'
+  'translationOf', 'hasShear',
+
+  // ---- PUBLIC-SURFACE-001: accepted Forge capability -------------------
+  // Geometry Forge: room generation and its semantic vocabulary.
+  'SURFACE_TYPES', 'SURFACE_NAMES', 'CONSTRAINT_FLAGS', 'GEOMETRY_REGIONS',
+  'ROOM_PARAMETER_BOUNDS', 'PILLAR_PARAMETER_BOUNDS', 'ROOM_PRESETS',
+  'resolveRoomParameters', 'createRoomDefinition', 'generateProceduralRoom',
+  // Character Forge. CHARACTER_REGIONS is the package name for the
+  // subsystem's internal `REGIONS`, which is too generic for a shared namespace.
+  'HUMANOID_PARAMETER_BOUNDS', 'HUMANOID_PRESETS', 'resolveHumanoidParameters',
+  'createCharacterDefinition', 'computeSemanticLandmarks', 'buildHumanoidCharacter',
+  'CHARACTER_REGIONS',
+  // Motion Forge.
+  'MOTION_PARAMETER_BOUNDS', 'MOTION_PRESETS', 'resolveMotionParameters',
+  'createMotionDefinition', 'createLocomotionEvaluator', 'solveTwoBoneIK',
+  'computeGaitFootPlacement', 'commitRootMotionIntent',
+  // World Forge.
+  'WORLD_PARAMETER_BOUNDS', 'createWorldRecipe', 'worldDataHash',
+  'createWorldFieldCache', 'createWorldFieldQuery', 'createWorldVolumeQuery',
+  'generateWorld',
+  // Material Forge: bounds discovery, matching every other Forge.
+  'MATERIAL_PARAMETER_BOUNDS'
 ]);
+
+/**
+ * Capability that stays INTERNAL after PUBLIC-SURFACE-001, with the reason.
+ *
+ * Listed rather than merely absent, because "we forgot" and "we decided" look
+ * identical from outside. Each is asserted absent below.
+ */
+const DELIBERATE_EXCLUSIONS = {
+  // Renderer primitives. A Forge result may CARRY renderer output; handing
+  // authors the builders would freeze presentation into the public contract.
+  buildBoxGeometry: 'renderer primitive',
+  buildCylinderGeometry: 'renderer primitive',
+  mergeSemanticGeometries: 'renderer primitive',
+  createTerrainGeometry: 'renderer primitive; generateWorld already returns the terrain',
+  compileMaterial: 'returns a Three.js material; same class as toBufferGeometry',
+  // Character assembly steps that buildHumanoidCharacter composes.
+  createHumanoidGeometry: 'assembly step',
+  createHumanoidSkeleton: 'assembly step',
+  applyHumanoidSkinning: 'assembly step',
+  // Deferred, not rejected.
+  BONE_DEFINITIONS: 'deferred; a built character exposes bonesByName',
+  BONE_NAME_TO_INDEX: 'deferred; a built character exposes bonesByName',
+  // Internal normalization createMaterialDefinition already performs.
+  normalizeColor: 'internal normalization',
+  resolveMaterialParameters: 'internal normalization',
+  // The overly generic internal name. CHARACTER_REGIONS is the public one.
+  REGIONS: 'too generic for a shared namespace; exported as CHARACTER_REGIONS'
+};
 
 /**
  * Modules forming the engine-owned authoring geometry layer. These must be
@@ -195,6 +272,23 @@ test('full purity: unearned systems are still absent from engine/full', () => {
       false,
       `engine/full must not export unearned system: ${name}`
     );
+  }
+});
+
+test('full purity: the Forges are flat named exports, not namespace objects', () => {
+  // PUBLIC-SURFACE-001 made these systems public. It deliberately did NOT
+  // introduce namespace objects, so these names must stay free.
+  for (const name of FORBIDDEN_NAMESPACE_NAMES) {
+    assert.equal(fullModule[name], undefined,
+      `engine/full must not add a "${name}" namespace: the surface is flat named exports`);
+    assert.equal(runtimeModule[name], undefined);
+  }
+});
+
+test('full purity: deliberate exclusions stay excluded, with recorded reasons', () => {
+  for (const [name, reason] of Object.entries(DELIBERATE_EXCLUSIONS)) {
+    assert.equal(name in fullModule, false,
+      `engine/full must not export ${name} (${reason})`);
   }
 });
 

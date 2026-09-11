@@ -28,7 +28,7 @@ The engine is additionally intended to become a **publicly released, general-pur
 
 That target does not change the thesis above and does not weaken the proof-driven discipline that governs implementation. It changes what the finished product must eventually be able to do.
 
-Sections 31 to 39 state the expanded requirements. Everything in those sections is **REQUIRED DIRECTION — NOT YET IMPLEMENTED** unless stated otherwise, and every one of them remains proof-gated: a requirement establishes that the engine must eventually be able to do something, never that it already can.
+Sections 31 to 39 state the expanded requirements. Everything in those sections is **REQUIRED DIRECTION — NOT YET IMPLEMENTED** unless that section states otherwise, and every one of them remains proof-gated: a requirement establishes that the engine must eventually be able to do something, never that it already can.
 
 ---
 
@@ -1096,9 +1096,9 @@ The near-term obligation is compatibility rather than implementation: public API
 
 ## 39. Supported Public Surface Requirement
 
-**Status: REQUIRED DIRECTION — NOT YET IMPLEMENTED.**
+**Status: BUILT BY PUBLIC-SURFACE-001 — AWAITING VALIDATION.** Not accepted.
 
-A repository audit found that significant accepted, implemented capability is not generally reachable through the supported public `engine/full` surface.
+A repository audit found that significant accepted, implemented capability was not generally reachable through the supported public `engine/full` surface. PUBLIC-SURFACE-001 reconciled it: Geometry Forge room generation, Character Forge, Motion Forge and World Forge are now reachable through the package, with deliberate exclusions recorded. See `ARCHITECTURE.md` §49 for the implemented shape.
 
 The rule this establishes:
 
@@ -1117,4 +1117,4 @@ Three clarifications, because this rule is easy to over-read:
 2. **A deep import is not a public API.** Reaching a capability by importing an internal module path is an unsupported workaround, not a supported route, and it silently freezes internal structure into the public contract.
 3. **The gap is a scheduling defect, not an architectural one.** The capabilities exist and are accepted; what is missing is the intentional decision about which of them are public and how.
 
-Reconciling the public surface is future work with its own bounded tranche. This section authorizes no export change.
+Reconciliation was performed by PUBLIC-SURFACE-001 as a routing tranche: no subsystem algorithm changed, and the two-entry-point architecture was preserved. The rule above remains the standing requirement for every future accepted subsystem.

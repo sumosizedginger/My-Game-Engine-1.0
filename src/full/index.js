@@ -14,9 +14,19 @@
  * anchors, Material Forge definitions, the Previewable contract, Preview Lab,
  * the canonical view solver and AssetPreviewManifest.
  *
- * Deliberately still absent: Kiln, Geometry Forge room generation, Character
- * Forge, Motion Forge and World Forge. They exist in the repository but no
- * public consumer has earned them.
+ * PUBLIC-SURFACE-001 then routed selected accepted Forge authoring capability
+ * through that same ./authoring.js surface: Geometry Forge room generation,
+ * Character Forge, Motion Forge and World Forge.
+ *
+ * Routing a Forge does NOT make its internals public. Each candidate was
+ * classified, and the exclusions are recorded rather than merely absent —
+ * renderer primitives and character assembly steps stay internal so the
+ * presentation layer remains replaceable. AUTHORING_SURFACE is the answer to
+ * what is actually exposed and what was deliberately withheld: it is assembled
+ * from live values, so unlike this comment it cannot drift from the module.
+ *
+ * Deliberately still absent: Kiln. It exists in the repository but no public
+ * consumer has earned it.
  *
  * Node-only evaluation machinery must never be re-exported from here.
  */
