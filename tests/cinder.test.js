@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildCinder } from '../examples/authoring/cinder-mk1/build.js';
-import { CINDER_PARAMETERS } from '../examples/authoring/cinder-mk1/definition.js';
+import { CINDER_PARAMETERS, REGION, SURFACE } from '../examples/authoring/cinder-mk1/definition.js';
 import { validateMesh, triangleCount } from '../src/geometry/mesh.js';
 import { meshHash, encodeMesh, bytesToHex } from '../src/geometry/mesh-codec.js';
 import { createPreviewable } from '../src/preview/previewable.js';
@@ -23,6 +23,55 @@ import { PREVIEW_BUDGET_DEFAULTS } from '../src/preview/budget.js';
 
 const MINIMUM_PARTS = 6;
 
+/**
+ * Removes comments so a source scan reads CODE rather than prose.
+ *
+ * The import-specifier scan below previously ran over raw source and matched
+ * the words `from "a plated assembly"` inside an explanatory comment, failing
+ * the build for an import that does not exist. A source-policy test that can
+ * be broken by writing an English sentence is not enforcing the policy.
+ *
+ * String literals are tracked so a quote inside code is never mistaken for a
+ * comment delimiter. Regex literals are not tracked; neither CINDER file
+ * contains one, and the `no raw vertex data` test keeps scanning full source.
+ *
+ * @param {string} source
+ * @returns {string} Source with comments removed.
+ */
+function stripComments(source) {
+  let out = '';
+  let state = 'code';
+  let i = 0;
+  while (i < source.length) {
+    const c = source[i];
+    const d = source[i + 1];
+    if (state === 'code') {
+      if (c === '/' && d === '/') { state = 'line'; i += 2; continue; }
+      if (c === '/' && d === '*') { state = 'block'; i += 2; continue; }
+      if (c === "'") state = 'single';
+      else if (c === '"') state = 'double';
+      else if (c === '`') state = 'template';
+      out += c; i += 1; continue;
+    }
+    if (state === 'line') {
+      if (c === '\n') { state = 'code'; out += c; }
+      i += 1; continue;
+    }
+    if (state === 'block') {
+      if (c === '*' && d === '/') { state = 'code'; i += 2; } else { i += 1; }
+      continue;
+    }
+    if (c === '\\') { out += c + (d ?? ''); i += 2; continue; }
+    if ((state === 'single' && c === "'") ||
+        (state === 'double' && c === '"') ||
+        (state === 'template' && c === '`')) {
+      state = 'code';
+    }
+    out += c; i += 1;
+  }
+  return out;
+}
+
 test('CINDER is structurally valid', () => {
   const { meshIR } = buildCinder();
   const { valid, diagnostics } = validateMesh(meshIR);
@@ -41,10 +90,60 @@ test('CINDER has at least six semantically named parts', () => {
 });
 
 test('CINDER covers the expected weapon decomposition', () => {
+  // Assemblies are matched by NAMESPACE rather than by one exact part name.
+  // The asset now decomposes each assembly into several named pieces
+  // (`receiver.lower.core`, `receiver.upper.deck`, ...), so requiring a single
+  // part literally called `receiver` would force the decomposition to stay
+  // coarse. Requiring the namespace is the stronger check: it proves both that
+  // the assembly exists and that its parts are hierarchically named.
   const names = buildCinder().meshIR.parts.map((p) => p.semanticName);
-  for (const expected of ['receiver', 'barrel', 'handguard', 'stock', 'magazine', 'optic.body']) {
-    assert.ok(names.includes(expected), `missing part: ${expected}`);
+  for (const assembly of ['receiver', 'barrel', 'handguard', 'stock', 'magazine', 'optic', 'grip', 'muzzle']) {
+    assert.ok(
+      names.some((n) => n === assembly || n.startsWith(`${assembly}.`)),
+      `missing assembly: ${assembly}`
+    );
   }
+  assert.ok(names.includes('optic.body'), 'the optic must still name its body part');
+});
+
+test('CINDER part names form a consistent hierarchy', () => {
+  const names = buildCinder().meshIR.parts.map((p) => p.semanticName);
+  for (const name of names) {
+    assert.match(name, /^[a-z][A-Za-z0-9]*(\.[A-Za-z0-9]+)*$/,
+      `"${name}" is not a dotted lowerCamel namespace path`);
+  }
+  // Repeated detail must be indexed with a stable fixed width, or manifests
+  // and diffs sort `.10` before `.2`.
+  const indexed = names.filter((n) => /\.\d+$/.test(n));
+  assert.ok(indexed.length > 20, 'the asset should carry repeated indexed detail');
+  for (const name of indexed) {
+    assert.match(name, /\.\d{2}$/, `"${name}" must use a two-digit index`);
+  }
+});
+
+test('CINDER parts carry semantic region and surface identity', () => {
+  const { meshIR } = buildCinder();
+  const regions = new Set(Object.values(REGION));
+  const surfaces = new Set(Object.values(SURFACE));
+  const seenRegions = new Set();
+  const seenSurfaces = new Set();
+
+  const { regionId, surfaceId } = meshIR.attributes;
+  assert.ok(regionId, 'regionId attribute must be present');
+  assert.ok(surfaceId, 'surfaceId attribute must be present');
+
+  for (const part of meshIR.parts) {
+    const vertex = meshIR.indices[part.indexStart];
+    const region = regionId[vertex];
+    const surface = surfaceId[vertex];
+    assert.ok(regions.has(region), `${part.semanticName} has unknown regionId ${region}`);
+    assert.ok(surfaces.has(surface), `${part.semanticName} has unknown surfaceId ${surface}`);
+    seenRegions.add(region);
+    seenSurfaces.add(surface);
+  }
+
+  assert.ok(seenRegions.size >= 8, `expected most regions used, saw ${seenRegions.size}`);
+  assert.ok(seenSurfaces.size >= 6, `expected most surfaces used, saw ${seenSurfaces.size}`);
 });
 
 test('every CINDER part appears in the manifest with name, bounds, triangles and material', () => {
@@ -70,7 +169,14 @@ test('every CINDER part appears in the manifest with name, bounds, triangles and
 
 test('CINDER surface appearance comes from Material Forge', () => {
   const { materials, meshIR } = buildCinder();
-  assert.equal(materials.length, 4, 'four material families');
+  // The exact family count is ART and may change freely. What the pipeline
+  // requires is that there are several distinct families, that they all come
+  // from Material Forge, that they stay inside the preview budget, and that
+  // every part references one that exists.
+  assert.ok(materials.length >= 4, `expected several material families, got ${materials.length}`);
+  assert.ok(materials.length <= PREVIEW_BUDGET_DEFAULTS.maxMaterials,
+    `${materials.length} families exceeds the preview budget`);
+  assert.equal(new Set(materials.map((m) => m.id)).size, materials.length, 'material ids must be unique');
   for (const definition of materials) {
     assert.equal(definition.type, 'material');
     assert.ok(definition.data.parameters);
@@ -84,12 +190,13 @@ test('CINDER surface appearance comes from Material Forge', () => {
 test('CINDER carries the semantic anchors a weapon needs', () => {
   const { meshIR } = buildCinder();
   const names = meshIR.anchors.map((a) => a.name);
-  for (const expected of ['weapon.muzzle', 'weapon.grip.R', 'weapon.grip.L', 'weapon.magazineSocket', 'weapon.opticSocket']) {
+  assert.equal(new Set(names).size, names.length, 'anchor names must be unique');
+  for (const expected of ['weapon.muzzle', 'weapon.grip.primary', 'weapon.grip.support', 'weapon.magazineSocket', 'weapon.opticSocket', 'weapon.sightLine', 'weapon.stock.buttPlate', 'weapon.chargingHandle']) {
     assert.ok(names.includes(expected), `missing anchor: ${expected}`);
   }
   // Anchors survived transform and merge with their owning part intact.
   const muzzle = meshIR.anchors.find((a) => a.name === 'weapon.muzzle');
-  assert.equal(muzzle.partId, 'muzzleBrake');
+  assert.equal(muzzle.partId, 'muzzle.crown');
   assert.ok(muzzle.position[2] < -0.4, 'muzzle should sit forward along -Z');
   for (const anchor of meshIR.anchors) {
     assert.ok(meshIR.parts.some((p) => p.id === anchor.partId), `${anchor.name} references a missing part`);
@@ -193,14 +300,16 @@ test('CINDER authors through the public package export, not private deep imports
   const fs = await import('node:fs');
   for (const file of ['build.js', 'definition.js']) {
     const source = fs.readFileSync(new URL(`../examples/authoring/cinder-mk1/${file}`, import.meta.url), 'utf8');
-    const imports = [...source.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]);
+    const code = stripComments(source);
+    const imports = [...code.matchAll(/from\s+['"]([^'"]+)['"]/g)].map((m) => m[1]);
+    assert.ok(imports.length > 0, `${file} should declare at least one import`);
     for (const specifier of imports) {
       const isPublicPackage = specifier === '@sumosizedginger/my-game-engine-1.0/full';
       const isLocal = specifier.startsWith('./');
       assert.ok(isPublicPackage || isLocal,
         `${file} imports "${specifier}"; CINDER may only use the public package export or its own local files`);
     }
-    assert.equal(source.includes('../../src/'), false, `${file} must not deep-import engine internals`);
+    assert.equal(code.includes('../../src/'), false, `${file} must not deep-import engine internals`);
   }
 });
 
@@ -219,8 +328,17 @@ test('CINDER does not touch the renderer: authoring output is pure data', async 
 
 test('CINDER parameters stay data, so an agent can revise numbers rather than code', () => {
   assert.ok(Object.isFrozen(CINDER_PARAMETERS));
-  assert.ok(CINDER_PARAMETERS.barrel.length > 0);
-  assert.ok(CINDER_PARAMETERS.receiver.width > 0);
+  // Every assembly group must itself be frozen, or "parameters are data" is
+  // true only at the top level and an agent can still mutate a nested group.
+  for (const [group, value] of Object.entries(CINDER_PARAMETERS)) {
+    assert.ok(Object.isFrozen(value), `CINDER_PARAMETERS.${group} must be frozen`);
+    for (const [key, number] of Object.entries(value)) {
+      assert.ok(Number.isFinite(number), `CINDER_PARAMETERS.${group}.${key} must be a finite number`);
+    }
+  }
+  assert.ok(CINDER_PARAMETERS.barrel.radius > 0);
+  assert.ok(CINDER_PARAMETERS.lower.width > 0);
+  assert.ok(CINDER_PARAMETERS.datum.receiverRearZ > CINDER_PARAMETERS.datum.receiverFrontZ);
 });
 
 test('CINDER reports its generation time', () => {
