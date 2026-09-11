@@ -40,7 +40,8 @@ Accepted implementation now includes:
 - Proof E: Blind API Generality Test (Order Five, a bounded 3D collection/puzzle game).
 
 - AI-ASSET-FOUNDATION-001: engine-owned AI-native asset authoring.
-- SCENE-COMPOSITION-001: scene and composition foundation — **built, repaired at R1 and R2, awaiting re-audit**.
+- SCENE-COMPOSITION-001: scene and composition foundation.
+- PUBLIC-SURFACE-001: accepted Forge capability reachable through the package — **built, awaiting validation**.
 
 Proof E is accepted: a fresh blind participant successfully built Order Five through the documented public engine surface without core engine modification or private API bypass. This provides strong evidence of runtime and compiler public coherence, though it represents generality evidence rather than universal genre support.
 
@@ -54,7 +55,7 @@ The engine is additionally intended to become a **publicly released, general-pur
 
 That target is recorded in [PRD.md](PRD.md) Part II and its cross-system boundaries in [ARCHITECTURE.md](ARCHITECTURE.md) Part II.
 
-**Almost none of it is implemented.** Physics, animation graphs, story and quest graphs, timelines, audio, runtime UI, save and persistence, asset import, streaming, networking and accessibility are product *direction*, not capability. Scene composition is the first of them to have a built foundation, and that foundation is awaiting re-audit rather than accepted. Each is earned by a real forcing consumer and accepted through the normal proof, audit and verification chain. Nothing in this repository should be read as advertising a system that does not exist.
+**Almost none of it is implemented.** Physics, animation graphs, story and quest graphs, timelines, audio, runtime UI, save and persistence, asset import, streaming, networking and accessibility are product *direction*, not capability. Scene composition is the first of them to have an accepted foundation, merged at `c8afd65` after independent verification. Each is earned by a real forcing consumer and accepted through the normal proof, audit and verification chain. Nothing in this repository should be read as advertising a system that does not exist.
 
 ## Quick Start
 
@@ -78,7 +79,7 @@ The export contracts in [package.json](package.json) are:
 | --- | --- |
 | `@sumosizedginger/my-game-engine-1.0` | Defaults to the runtime exports for ordinary game consumption. |
 | `@sumosizedginger/my-game-engine-1.0/runtime` | Runtime and Gameplay Foundation primitives, without the definition compiler. Includes `instantiateScene` for loading compiled scenes. |
-| `@sumosizedginger/my-game-engine-1.0/full` | Runtime exports plus the accepted authoring surface: `compileDefinition`, `createEngineFull`, and the AI-native asset authoring API earned by AI-ASSET-FOUNDATION-001 — MeshIR and its canonical codec, the modeling verbs, semantic anchors, Material Forge definitions, the Previewable contract, the Preview Lab, the canonical view solver and `AssetPreviewManifest` — plus scene authoring from SCENE-COMPOSITION-001: `createSceneDefinition`, `validateSceneDefinition`, `compileScene`, `encodeScene`/`decodeScene`. |
+| `@sumosizedginger/my-game-engine-1.0/full` | Runtime exports plus the full accepted authoring surface — see below. |
 
 For example, project code in this repository can import:
 
@@ -93,9 +94,32 @@ These package export names resolve under Node and Vite package self-reference. W
 
 These names describe package exports, not npm publication status.
 
-**The `/full` export does not yet re-export every implemented subsystem.** Character Forge, Motion Forge, World Forge and Geometry Forge room generation exist in this repository and are accepted, but they are reachable only as internal repository implementations rather than package subpath exports. Ordinary project code does not need them merely to create 3D presentation; direct Three.js project presentation remains fully legitimate where procedural forge compilation is not required.
+### What `/full` provides
 
-That gap is a known, recorded finding rather than a design intent. Public release requires that accepted capability intended for external authoring be reachable through an intentional supported entry point, and a deep import into an internal module path is not one. See [PRD.md](PRD.md) §39 for the rule and [ARCHITECTURE.md](ARCHITECTURE.md) §49 for the constraints on closing it. Reconciling the public surface is future work with its own tranche; until it happens, treat internal module paths as unstable.
+| Area | Capability |
+| --- | --- |
+| Definition seam | `compileDefinition`, `createEngineFull` |
+| AI-native assets | MeshIR and its canonical codec, the modeling verbs, semantic anchors, the Previewable contract, the Preview Lab, the canonical view solver, `AssetPreviewManifest` |
+| Scene composition | `createSceneDefinition`, `validateSceneDefinition`, `compileScene`, `encodeScene` / `decodeScene`, affine primitives |
+| Geometry Forge | `createRoomDefinition`, `generateProceduralRoom`, `ROOM_PRESETS`, `ROOM_PARAMETER_BOUNDS`, and the semantic vocabulary (`SURFACE_TYPES`, `CONSTRAINT_FLAGS`, `GEOMETRY_REGIONS`) |
+| Character Forge | `createCharacterDefinition`, `buildHumanoidCharacter`, `computeSemanticLandmarks`, `HUMANOID_PRESETS`, `HUMANOID_PARAMETER_BOUNDS`, `CHARACTER_REGIONS` |
+| Motion Forge | `createMotionDefinition`, `createLocomotionEvaluator`, `solveTwoBoneIK`, `computeGaitFootPlacement`, `commitRootMotionIntent`, `MOTION_PRESETS` |
+| World Forge | `createWorldRecipe`, `generateWorld`, `createWorldFieldQuery`, `createWorldVolumeQuery`, `worldDataHash`, `WORLD_PARAMETER_BOUNDS` |
+| Material Forge | `createMaterialDefinition`, `MATERIAL_PRESETS`, `MATERIAL_PARAMETER_BOUNDS` |
+
+`AUTHORING_SURFACE.forges` describes each subsystem — its capabilities, presets, parameter bounds, conventions and deliberate exclusions — as machine-readable data, so a tool or an agent can discover the surface instead of guessing at it.
+
+### What `/full` deliberately does NOT provide
+
+Renderer primitives stay internal so the presentation layer remains replaceable: `toBufferGeometry`, `buildBoxGeometry`, `createTerrainGeometry` and `compileMaterial` are not exported. A Forge result may *carry* renderer output — `generateWorld` returns a terrain geometry, `buildHumanoidCharacter` returns a skinned mesh — but the builders that produced it are not part of the contract.
+
+Node-only evaluation machinery is never public. Character assembly steps and the canonical bone table are internal or deferred; a built character already exposes `bonesByName`.
+
+**Results that own renderer resources must be disposed by their consumer.** `generateWorld(...).dispose()`, and the geometry and material on a built character.
+
+### Authoring is not runtime
+
+The generation capability above lives in `/full` only. An exported game instantiates compiled content through `/runtime` and does not carry the generators — `CONSTITUTION.md` §5. `examples/public-surface-cell/` is a worked example that uses nothing but the package specifier.
 
 ### Build Your First Game
 

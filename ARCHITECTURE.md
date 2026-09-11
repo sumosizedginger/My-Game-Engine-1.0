@@ -1429,9 +1429,9 @@ If a simpler design survives the same proofs and preserves the Constitution, pre
 
 ## 43. Scene and Composition Architecture
 
-### FOUNDATION BUILT — AWAITING RE-AUDIT
+### ACCEPTED
 
-SCENE-COMPOSITION-001 implemented the foundation. Successive independent audits failed it twice — two blocking defects repaired at R1, and a unit-quaternion source-contract defect repaired at R2 (see `docs/spec/scene.md` §12.1). It has **not** been re-audited or human-accepted, and must not be described as ACCEPTED until it is.
+SCENE-COMPOSITION-001 is accepted and merged at `c8afd653d2bef08c7262bfb6fb65ecc753192439` after independent verification. Successive audits failed it twice before that — two blocking defects repaired at R1, and a unit-quaternion source-contract defect repaired at R2 (see `docs/spec/scene.md` §12.1).
 
 **What now exists.** `SceneDefinition` (source) compiles to a deep-frozen `SceneArtifact` and instantiates into a `SceneInstance`: persistent authored identity, hierarchy, local transforms, derived world composition as affine matrices, deterministic canonical serialization, immutable artifact identity, runtime entity mapping, clean unload and reload, independent instances, structured diagnostics, and a supported public API split across `engine/runtime` and `engine/full`. Its forcing consumer is the SUBTERRA cell, a 37-node constructed environment. The subsystem specification is `docs/spec/scene.md`.
 
@@ -1685,13 +1685,15 @@ Whenever a future compilation step does reduce render groups, source semantics m
 
 ## 49. Supported Public Surface Boundary
 
-### REQUIRED DIRECTION — RECONCILIATION NOT YET PERFORMED
+### BUILT BY PUBLIC-SURFACE-001 — AWAITING VALIDATION
 
 `CONSTITUTION.md` §5 establishes two entry points. §30 establishes the public API boundary. This section records an audit finding against them.
 
-### 49.1 The finding
+### 49.1 The finding, and its resolution
 
-Significant accepted, implemented capability — including Character Forge, Motion Forge and World Forge — is not generally reachable through the supported public `engine/full` surface. `src/full/index.js` states this deliberately and accurately; the defect is that the deliberate choice has never been revisited against the public-release product target.
+Significant accepted, implemented capability — Character Forge, Motion Forge, World Forge and Geometry Forge room generation — was not reachable through the supported public `engine/full` surface. `src/full/index.js` stated the exclusion deliberately and accurately; the defect was that the choice had never been revisited against the public-release product target.
+
+PUBLIC-SURFACE-001 reconciled it. A **routing** tranche: no subsystem algorithm changed, and tests compare public-route output against the accepted subsystem to prove it.
 
 ### 49.2 The rule
 
@@ -1700,8 +1702,26 @@ IMPLEMENTED + ACCEPTED + INTENDED FOR EXTERNAL AUTHORING
         -> MUST HAVE A SUPPORTED PUBLIC ROUTE
 ```
 
-### 49.3 Constraints on satisfying it
+### 49.3 Constraints, and how they were satisfied
 
-- **A deep import is not a public API.** Importing an internal module path is an unsupported workaround that silently freezes internal structure into the public contract.
-- **Exposure is a decision, not a default.** Not every internal module should be public. §5 requires that an ordinary exported game not ship the entire authoring toolchain, and that constraint is unchanged.
-- **Reconciliation is its own tranche.** No export change is authorized here.
+- **A deep import is not a public API.** Importing an internal module path is an unsupported workaround that silently freezes internal structure into the public contract. The forcing consumer `examples/public-surface-cell/` imports nothing but the package specifier, and a test fails if that ever changes.
+- **Exposure is a decision, not a default.** Each candidate was classified PUBLIC NOW, INTERNAL or DEFERRED. Renderer primitives (`buildBoxGeometry`, `createTerrainGeometry`, `compileMaterial`, `toBufferGeometry`) stay internal so the presentation layer remains replaceable; character assembly steps stay internal; the canonical bone table is deferred until an attachment API earns it. Every exclusion carries a recorded reason in `AUTHORING_SURFACE`.
+- **Authoring is not runtime.** §5 is unchanged: generation lives in `engine/full`, an exported game instantiates compiled content through `engine/runtime`, and the purity tests enforce the split in both directions.
+
+### 49.4 Implemented shape
+
+**Two entry points, unchanged.** No new package subpath was invented. Authoring and generation went to `engine/full`; `engine/runtime` gained nothing.
+
+**Flat named exports, not namespace objects.** That matches the existing surface and stays tree-shakeable. `GeometryForge`-style names are explicitly kept free, because two routes to one capability is two contracts that will drift.
+
+**One name was renamed at the boundary.** Character Forge's internal `REGIONS` is published as `CHARACTER_REGIONS`: a name that generic cannot be safe in a shared namespace.
+
+**Discoverability is part of the contract.** `AUTHORING_SURFACE.forges` describes each subsystem from live values — preset and parameter names are read from the real objects — and tests assert the description both ways: nothing advertised is missing, nothing public is undescribed.
+
+**Resource ownership is stated.** Some Forge results own renderer resources. The contract says so, and the forcing consumer disposes them.
+
+### 49.5 A cost this surfaced
+
+Making the Forges reachable from `engine/full` means any module statically importing that barrel pulls World, Character and Motion into its graph. The repository's browser harness did exactly that for a single boot check, which put world generation on the Pong route. The import was made lazy rather than the guard relaxed.
+
+This is the standing tension in §5, now with teeth: a wide authoring barrel is convenient to import and expensive to import accidentally. Future additions to `engine/full` should assume a route-isolation test will catch careless static imports, and that catching them is the point.

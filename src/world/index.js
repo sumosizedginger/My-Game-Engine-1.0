@@ -1,8 +1,8 @@
 import { BufferGeometry, Float32BufferAttribute } from 'three';
-import { createWorldRecipe, seededUnit, worldDataHash } from './recipe.js';
+import { WORLD_PARAMETER_BOUNDS, createWorldRecipe, seededUnit, worldDataHash } from './recipe.js';
 import { createWorldFieldCache, createWorldFieldQuery } from './fields.js';
 import { createWorldVolumeQuery } from './volumes.js';
-export { createWorldRecipe, worldDataHash, createWorldFieldCache, createWorldFieldQuery, createWorldVolumeQuery };
+export { WORLD_PARAMETER_BOUNDS, createWorldRecipe, worldDataHash, createWorldFieldCache, createWorldFieldQuery, createWorldVolumeQuery };
 
 export function createTerrainGeometry(cache) {
   const { resolution: n, spacing, half, height, forest } = cache;

@@ -746,6 +746,35 @@ Donor code has evidence priority, not constitutional priority.
 
 ---
 
+# 14.5 Public Surface Maintenance
+
+Changing what the package exports is a contract change, not a refactor.
+
+Read:
+
+```text
+ARCHITECTURE.md 49
+PRD.md 39
+tests/purity.test.js
+```
+
+The contract lives in four places, deliberately, and they are cross-checked:
+
+- `ARCHITECTURE.md` 49 — the boundary, the implemented shape, the exclusions and why;
+- `tests/purity.test.js` — the ENFORCED allowlist; adding a public export means editing it on purpose;
+- `AUTHORING_SURFACE` in `src/full/authoring.js` — the machine-readable description, asserted both ways so nothing is advertised-but-absent or public-but-undiscoverable;
+- `README.md` — the developer-facing summary.
+
+There is no separate public-surface specification. A fifth document describing
+the same contract would be the hand-maintained encyclopedia §34 warns about,
+and it would drift first.
+
+Before exporting anything, classify it PUBLIC NOW, INTERNAL or DEFERRED, and
+record the reason for anything excluded. "We forgot" and "we decided" look
+identical from outside a package.
+
+---
+
 # 15. Dependency Admission
 
 For any new production dependency, read:

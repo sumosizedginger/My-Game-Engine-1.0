@@ -3,6 +3,7 @@
  * Canonical repository: sumosizedginger/My-Game-Engine-1.0
  *
  * Supports:
+ * 0. Public Surface acceptance (?surface=1)
  * 0. Scene Composition (?scene=subterra)
  * 1. Proof B1 Motion Truth (?proof=b1)
  * 2. Proof A Pong Game (?game=pong)
@@ -17,7 +18,14 @@ import {
   CANONICAL_REPOSITORY
 } from '../runtime/index.js';
 
-import { createEngineFull, ENTRY_POINT as FULL_ENTRY_POINT } from '../full/index.js';
+// engine/full is imported LAZILY, inside the one branch that uses it.
+//
+// PUBLIC-SURFACE-001 made the accepted Forges reachable through engine/full, so
+// a static import here would pull World, Character and Motion Forge into EVERY
+// route, including Pong. That was a latent defect in this harness rather than
+// in the new surface: the import served a single boot check. Keeping it static
+// would also rub against CONSTITUTION.md 5, which exists so a small game does
+// not carry the whole generation toolchain.
 import { createPongGame } from '../games/pong/index.js';
 import { createB1Viewer } from './b1-viewer.js';
 import { createB2Viewer } from './b2-viewer.js';
@@ -32,7 +40,15 @@ const isControlled = params.has('controlled');
 
 const app = document.getElementById('app');
 
-if (params.has('scene')) {
+if (params.has('surface')) {
+  // PUBLIC-SURFACE-001: proves the package self-reference resolves through the
+  // bundler, not only through Node, and that Forge generation reaches the browser.
+  const { createPublicSurfaceViewer, recreatePublicSurfaceViewer } = await import('./public-surface-viewer.js');
+  const seedParam = params.get('seed');
+  const options = seedParam === null ? {} : { seed: Number(seedParam) };
+  createPublicSurfaceViewer(app, options);
+  window.__PUBLIC_SURFACE_RECREATE__ = () => recreatePublicSurfaceViewer(app, options);
+} else if (params.has('scene')) {
   // SCENE-COMPOSITION-001: human-visible instantiated scene composition.
   const { createSceneViewer, recreateSceneViewer } = await import('./scene-viewer.js');
   const sceneKey = params.get('scene') || 'subterra';
@@ -384,6 +400,7 @@ if (params.has('scene')) {
     results.checks.instantiate = instance.artifactId === sampleArtifact.id && typeof instance.instantiatedAt === 'number';
 
     // 3. Full engine mode verification (engine/full seam)
+    const { createEngineFull, ENTRY_POINT: FULL_ENTRY_POINT } = await import('../full/index.js');
     const fullEngine = createEngineFull({ env: 'browser' });
     results.checks.fullEngineSeam = fullEngine.entryPoint === FULL_ENTRY_POINT && fullEngine.entryPoint === 'engine/full';
 

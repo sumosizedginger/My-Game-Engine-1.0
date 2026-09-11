@@ -1,0 +1,144 @@
+/**
+ * My Game Engine 1.0 — Public Surface Acceptance Viewer styling.
+ * Presentation only.
+ */
+
+.ps-root {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  height: 100vh;
+  width: 100%;
+  background: #0d0f12;
+  color: #cbd5e1;
+  font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.ps-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: #0f1216;
+}
+
+.ps-stage canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.ps-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  overflow-y: auto;
+  background: #111318;
+  border-left: 1px solid #23262d;
+}
+
+.ps-panel h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: #e2e8f0;
+}
+
+.ps-panel h2 {
+  margin: 4px 0 0;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.ps-tranche {
+  margin: 2px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: #38bdf8;
+}
+
+.ps-note {
+  margin: 0;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.ps-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: #7dd3fc;
+  overflow-wrap: anywhere;
+}
+
+.ps-identity {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+}
+
+.ps-identity > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.ps-identity dt {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.ps-identity dd {
+  margin: 0;
+  color: #e2e8f0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ps-identity code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #7dd3fc;
+}
+
+.ps-forges {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.ps-forge {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border-left: 2px solid #38bdf8;
+  background: #14171d;
+  border-radius: 0 4px 4px 0;
+}
+
+.ps-forge-name {
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ps-forge-detail {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: #64748b;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .ps-root {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(240px, 1fr) auto;
+    height: auto;
+  }
+  .ps-panel {
+    border-left: none;
+    border-top: 1px solid #23262d;
+  }
+}

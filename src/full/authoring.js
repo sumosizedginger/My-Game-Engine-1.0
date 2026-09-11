@@ -154,6 +154,89 @@ export {
   hasShear
 } from '../scene/affine.js';
 
+// ---------------------------------------------------------------------------
+// ACCEPTED FORGE CAPABILITY — PUBLIC-SURFACE-001
+//
+// Character, Motion, World and Geometry room generation were implemented and
+// accepted, but an external author could only reach them by deep-importing
+// repository paths. PRD.md §39 makes that a defect: implemented + accepted +
+// intended for external authoring MUST have a supported public route.
+//
+// This is a ROUTING reconciliation, not new capability. No subsystem algorithm
+// changed. Every name below is a deliberate decision, allowlisted in
+// tests/purity.test.js and described in AUTHORING_SURFACE.
+//
+// FLAT NAMED EXPORTS, not namespace objects. That matches the existing surface,
+// stays tree-shakeable, and keeps `CharacterForge`-style names free — which
+// tests/purity.test.js still forbids, because two ways to reach one capability
+// is two contracts.
+//
+// The exclusions are as deliberate as the inclusions. Renderer primitives
+// (buildBoxGeometry, compileMaterial, toBufferGeometry) stay internal so the
+// presentation layer remains replaceable; a Forge that returns renderer output
+// as part of its accepted result is a different thing from handing authors the
+// builders.
+// ---------------------------------------------------------------------------
+
+// Geometry Forge: room generation and the semantic vocabulary that makes its
+// output machine-readable.
+export {
+  SURFACE_TYPES,
+  SURFACE_NAMES,
+  CONSTRAINT_FLAGS,
+  GEOMETRY_REGIONS,
+  ROOM_PARAMETER_BOUNDS,
+  PILLAR_PARAMETER_BOUNDS,
+  ROOM_PRESETS,
+  resolveRoomParameters,
+  createRoomDefinition,
+  generateProceduralRoom
+} from '../geometry/index.js';
+
+// Character Forge. `REGIONS` is re-exported as CHARACTER_REGIONS: the internal
+// name is far too generic for a shared package namespace.
+export {
+  HUMANOID_PARAMETER_BOUNDS,
+  HUMANOID_PRESETS,
+  resolveHumanoidParameters,
+  createCharacterDefinition,
+  computeSemanticLandmarks,
+  buildHumanoidCharacter,
+  REGIONS as CHARACTER_REGIONS
+} from '../character/index.js';
+
+// Motion Forge.
+export {
+  MOTION_PARAMETER_BOUNDS,
+  MOTION_PRESETS,
+  resolveMotionParameters,
+  createMotionDefinition,
+  createLocomotionEvaluator,
+  solveTwoBoneIK,
+  computeGaitFootPlacement,
+  commitRootMotionIntent
+} from '../motion/index.js';
+
+// World Forge. The two query constructors are exported because CONSTITUTION.md
+// §19 makes WorldFieldQuery and WorldVolumeQuery first-class architecture, and
+// createWorldFieldCache comes with them because the query cannot be built
+// without it.
+export {
+  WORLD_PARAMETER_BOUNDS,
+  createWorldRecipe,
+  worldDataHash,
+  createWorldFieldCache,
+  createWorldFieldQuery,
+  createWorldVolumeQuery,
+  generateWorld
+} from '../world/index.js';
+
+// Material Forge gains only its parameter bounds here; createMaterialDefinition
+// and MATERIAL_PRESETS were already public.
+export {
+  MATERIAL_PARAMETER_BOUNDS
+} from '../material/index.js';
+
 import { MESH_OP_DESCRIPTORS } from '../geometry/mesh-ops.js';
 import { MESH_IR_VERSION as IR_VERSION, ATTRIBUTE_ITEM_SIZE } from '../geometry/mesh.js';
 import { MESH_CODEC_VERSION as CODEC_VERSION } from '../geometry/mesh-codec.js';
@@ -164,6 +247,23 @@ import { SCENE_DEFINITION_VERSION as SCENE_V } from '../scene/definition.js';
 import { SCENE_CODEC_VERSION as SCENE_CODEC_V } from '../scene/codec.js';
 import { SCENE_ARTIFACT_VERSION as SCENE_ARTIFACT_V } from '../scene/compiler.js';
 import { QUATERNION_UNIT_TOLERANCE as QUAT_TOL } from '../geometry/mesh.js';
+// Live values for the Forge descriptors below. Preset and bound NAMES are read
+// from the real objects so the descriptor cannot drift from the code.
+import {
+  ROOM_PRESETS as ROOMS, ROOM_PARAMETER_BOUNDS as ROOM_BOUNDS,
+  SURFACE_TYPES as SURFACES, GEOMETRY_REGIONS as GEO_REGIONS
+} from '../geometry/index.js';
+import {
+  HUMANOID_PRESETS as HUMANOIDS, HUMANOID_PARAMETER_BOUNDS as HUMANOID_BOUNDS,
+  REGIONS as CHAR_REGIONS
+} from '../character/index.js';
+import {
+  MOTION_PRESETS as MOTIONS, MOTION_PARAMETER_BOUNDS as MOTION_BOUNDS
+} from '../motion/index.js';
+import { WORLD_PARAMETER_BOUNDS as WORLD_BOUNDS } from '../world/index.js';
+import {
+  MATERIAL_PRESETS as MATERIALS, MATERIAL_PARAMETER_BOUNDS as MATERIAL_BOUNDS
+} from '../material/index.js';
 
 /**
  * Machine-readable description of the public authoring capabilities.
@@ -213,6 +313,133 @@ export const AUTHORING_SURFACE = Object.freeze({
       reason: 'Node-only evaluation tooling; depends on puppeteer-core and node:fs. The shared contract is solveCanonicalView.'
     })
   ]),
+  /**
+   * Accepted Forge subsystems reachable through engine/full.
+   *
+   * Preset and bound NAMES are read from the live objects, so a preset added
+   * to a Forge appears here without anyone remembering to update a list.
+   * `capabilities` is the one hand-written part, and tests/public-surface.test.js
+   * asserts it BOTH ways: every name listed is exported, and every newly public
+   * Forge export is listed. A descriptor an agent cannot trust is worse than
+   * none.
+   */
+  forges: Object.freeze({
+    geometry: Object.freeze({
+      subsystem: 'Geometry Forge',
+      specification: 'GEOMETRY_FORGE.md',
+      accepted: 'Proof B2',
+      publicSince: 'PUBLIC-SURFACE-001',
+      capabilities: Object.freeze([
+        'SURFACE_TYPES', 'SURFACE_NAMES', 'CONSTRAINT_FLAGS', 'GEOMETRY_REGIONS',
+        'ROOM_PARAMETER_BOUNDS', 'PILLAR_PARAMETER_BOUNDS', 'ROOM_PRESETS',
+        'resolveRoomParameters', 'createRoomDefinition', 'generateProceduralRoom'
+      ]),
+      presets: Object.freeze(Object.keys(ROOMS)),
+      parameters: Object.freeze(Object.keys(ROOM_BOUNDS)),
+      surfaceTypes: Object.freeze(Object.keys(SURFACES)),
+      regions: Object.freeze(Object.keys(GEO_REGIONS)),
+      conventions: 'A generated room returns { definition, visual, collision, semantics, stats }. Floor top sits at y = 0.',
+      notExported: Object.freeze([
+        Object.freeze({
+          name: 'buildBoxGeometry, buildCylinderGeometry, mergeSemanticGeometries',
+          reason: 'Renderer primitives. A Forge may return renderer output as part of an accepted result; handing authors the builders would freeze the presentation layer into the public contract.'
+        })
+      ])
+    }),
+
+    character: Object.freeze({
+      subsystem: 'Character Forge',
+      specification: 'CHARACTER_FORGE.md',
+      accepted: 'Proof B1',
+      publicSince: 'PUBLIC-SURFACE-001',
+      capabilities: Object.freeze([
+        'HUMANOID_PARAMETER_BOUNDS', 'HUMANOID_PRESETS', 'resolveHumanoidParameters',
+        'createCharacterDefinition', 'computeSemanticLandmarks', 'buildHumanoidCharacter',
+        'CHARACTER_REGIONS'
+      ]),
+      presets: Object.freeze(Object.keys(HUMANOIDS)),
+      parameters: Object.freeze(Object.keys(HUMANOID_BOUNDS)),
+      regions: Object.freeze(Object.keys(CHAR_REGIONS)),
+      conventions: 'buildHumanoidCharacter returns { definition, parameters, landmarks, geometry, skeleton, bonesByName, mesh, material, diagnostics }. It owns Three.js resources: dispose geometry and material when finished.',
+      ownsRendererResources: true,
+      notExported: Object.freeze([
+        Object.freeze({
+          name: 'createHumanoidGeometry, createHumanoidSkeleton, applyHumanoidSkinning',
+          reason: 'The steps buildHumanoidCharacter composes. Exposing them would freeze the assembly order into the public contract for no demonstrated external need.'
+        }),
+        Object.freeze({
+          name: 'BONE_DEFINITIONS, BONE_NAME_TO_INDEX',
+          reason: 'Deferred, not rejected. A built character already exposes bonesByName, which is what attachment needs today. A real attachment API can earn these later.'
+        })
+      ])
+    }),
+
+    motion: Object.freeze({
+      subsystem: 'Motion Forge',
+      specification: 'MOTION_FORGE.md',
+      accepted: 'Proof B1',
+      publicSince: 'PUBLIC-SURFACE-001',
+      capabilities: Object.freeze([
+        'MOTION_PARAMETER_BOUNDS', 'MOTION_PRESETS', 'resolveMotionParameters',
+        'createMotionDefinition', 'createLocomotionEvaluator', 'solveTwoBoneIK',
+        'computeGaitFootPlacement', 'commitRootMotionIntent'
+      ]),
+      presets: Object.freeze(Object.keys(MOTIONS)),
+      parameters: Object.freeze(Object.keys(MOTION_BOUNDS)),
+      conventions: 'createLocomotionEvaluator(character, motionPreset) is stateful and advanced by update(). commitRootMotionIntent writes through the transform owner; motion never mutates a world transform directly (CONSTITUTION.md §13).',
+      notExported: Object.freeze([])
+    }),
+
+    world: Object.freeze({
+      subsystem: 'World Forge',
+      specification: 'WORLD_FORGE.md',
+      accepted: 'Proof C',
+      publicSince: 'PUBLIC-SURFACE-001',
+      capabilities: Object.freeze([
+        'WORLD_PARAMETER_BOUNDS', 'createWorldRecipe', 'worldDataHash',
+        'createWorldFieldCache', 'createWorldFieldQuery', 'createWorldVolumeQuery',
+        'generateWorld'
+      ]),
+      parameters: Object.freeze(Object.keys(WORLD_BOUNDS)),
+      conventions: 'generateWorld returns a bounded world with recipe, fields, volumes, trees, cover, terrain, hashes and dispose(). It owns a Three.js terrain geometry: call dispose(). WorldFieldQuery is cheap 2.5D; WorldVolumeQuery is authoritative 3D (CONSTITUTION.md §19).',
+      ownsRendererResources: true,
+      deterministic: 'Same recipe produces the same world. worldDataHash gives comparable identity.',
+      notExported: Object.freeze([
+        Object.freeze({
+          name: 'createTerrainGeometry',
+          reason: 'Builds a Three.js BufferGeometry directly. generateWorld already returns the terrain it produces; exposing the builder would make renderer representation part of the contract.'
+        }),
+        Object.freeze({
+          name: 'streaming, chunking, residency',
+          reason: 'Not implemented. World generation is bounded. See ARCHITECTURE.md §46.'
+        })
+      ])
+    }),
+
+    material: Object.freeze({
+      subsystem: 'Material Forge',
+      specification: 'MATERIAL_FORGE.md',
+      accepted: 'Proof B2',
+      publicSince: 'AI-ASSET-FOUNDATION-001; parameter bounds added by PUBLIC-SURFACE-001',
+      capabilities: Object.freeze([
+        'MATERIAL_PARAMETER_BOUNDS', 'MATERIAL_PRESETS', 'createMaterialDefinition'
+      ]),
+      presets: Object.freeze(Object.keys(MATERIALS)),
+      parameters: Object.freeze(Object.keys(MATERIAL_BOUNDS)),
+      conventions: 'A MaterialDefinition is serializable source. Compilation to a renderer material is an engine-owned boundary.',
+      notExported: Object.freeze([
+        Object.freeze({
+          name: 'compileMaterial',
+          reason: 'Returns a Three.js MeshStandardMaterial. Same exclusion class as toBufferGeometry: authors describe materials, the engine decides how they are realized.'
+        }),
+        Object.freeze({
+          name: 'normalizeColor, resolveMaterialParameters',
+          reason: 'Internal normalization that createMaterialDefinition already performs and reports through diagnostics.'
+        })
+      ])
+    })
+  }),
+
   scene: Object.freeze({
     tranche: 'SCENE-COMPOSITION-001',
     pipeline: 'SceneDefinition -> compileScene -> SceneArtifact -> instantiateScene',
@@ -243,6 +470,9 @@ export const AUTHORING_SURFACE = Object.freeze({
     'A compiled artifact owns and deep-freezes its data; mutating the source definition afterwards cannot change it.',
     'Scene persistent ids belong to the source. Runtime entity handles are never serialized.',
     'Scene hierarchy is a forest: duplicate ids, missing parents, self-parents and cycles are refused.',
-    'A rotation must be a unit quaternion. Non-unit quaternions are refused, never normalized, because they apply an implicit scale and normalizing would rewrite authored source.'
+    'A rotation must be a unit quaternion. Non-unit quaternions are refused, never normalized, because they apply an implicit scale and normalizing would rewrite authored source.',
+    'Accepted capability intended for external authoring is reachable through engine/full. A deep import into src/ is not a supported route.',
+    'Renderer primitives stay internal. A Forge result may carry renderer output; the builders that produced it are not part of the contract.',
+    'A Forge result that owns Three.js resources must be disposed by its consumer.'
   ])
 });

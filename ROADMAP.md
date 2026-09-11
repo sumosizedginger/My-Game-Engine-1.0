@@ -798,11 +798,11 @@ Seven accepted future requirements sit on top of it and remain unbuilt: prefabs 
 
 ## 46.3 Public surface reconciliation
 
-**Not authorized. Recorded as a scheduling defect against the public-release target.**
+**BUILT by PUBLIC-SURFACE-001. Awaiting independent validation.**
 
-Accepted implemented capability — including Character Forge, Motion Forge and World Forge — is not generally reachable through the supported public `engine/full` surface. `src/full/index.js` states this deliberately; what was never revisited is whether that choice still holds now that public release is a product requirement.
+Accepted implemented capability — Character Forge, Motion Forge, World Forge and Geometry Forge room generation — was not reachable through the supported public `engine/full` surface without deep-importing internals. That is now reconciled.
 
-`PRD.md` §39 states the rule and `ARCHITECTURE.md` §49 states the constraints. A deep import is not a public API, and not everything internal should become public. Reconciliation needs its own bounded tranche.
+`PRD.md` §39 states the rule and `ARCHITECTURE.md` §49 records the implemented shape and its deliberate exclusions. The rule remains standing for every future accepted subsystem: a deep import is not a public API, and not everything internal should become public.
 
 ---
 
@@ -1231,7 +1231,8 @@ Statuses use the vocabulary in §3. Each is supported by an accepted base revisi
 | Proof E — Blind API Generality | **ACCEPTED** | `c62975dbf68c2305e38c00b9cdc1ed5707777d4a` | `docs/learn/BUILDING_AN_UNPLANNED_GAME.md` |
 | AI-ASSET-FOUNDATION-001 | **ACCEPTED** | `798bd89c006f20f0b9a9f20b05443b6493436d14` | merged as `07e555af55f5ee61f8fbef7fbd2da90d6d782419` after independent verification |
 | GENERAL-ENGINE-DIRECTION-001 | **BUILT — AWAITING AUDIT** | `dabd22920c39e9ebf458fba1cef5b40f3ac89f93` | documentation and product-direction reconciliation; not yet merged to main |
-| SCENE-COMPOSITION-001 | **BUILT — AWAITING RE-AUDIT** | see branch `scene-composition-001` | scene composition foundation; `docs/spec/scene.md`; forcing consumer SUBTERRA cell. `95ad733` failed independent validation on two blocking defects (R1); `e205c46` failed re-audit on a unit-quaternion contract defect (R2). See `docs/spec/scene.md` §12.1 |
+| SCENE-COMPOSITION-001 | **ACCEPTED** | `922f5a1e7e70a3e04488bf902643d3b4b17222c8` | merged as `c8afd653d2bef08c7262bfb6fb65ecc753192439` after independent verification. Two prior revisions failed audit and were repaired — see `docs/spec/scene.md` §12.1 |
+| PUBLIC-SURFACE-001 | **BUILT — AWAITING VALIDATION** | see branch `public-surface-001` | accepted Forge capability reachable through `engine/full`; forcing consumer `examples/public-surface-cell/`; `ARCHITECTURE.md` §49 |
 
 Acceptance evidence for the six proofs is the accepted learning material in `docs/learn/`, which §28 of `DOCUMENTATION_MAP.md` permits only after a proof is accepted, together with the base revision each lesson names.
 
@@ -1244,14 +1245,14 @@ Independent verification at the accepted revision reproduced: Node v24.21.0, 429
 ### 61.3 Current target
 
 ```text
-SCENE-COMPOSITION-001
-  scene composition foundation
-  BUILT - repaired at R1 and R2 - awaiting independent RE-AUDIT
+PUBLIC-SURFACE-001
+  accepted Forge capability reachable through the package
+  BUILT - awaiting independent validation
 ```
 
-It implements the keystone recorded in §46.2: engine-owned scene composition with persistent authored identity, hierarchy, derived world transforms, deterministic serialization, an immutable compiled artifact, runtime instantiation, and clean unload and reload. Its forcing consumer is the SUBTERRA cell, a 37-node constructed underground environment built through the public API.
+It closes the scheduling defect recorded in §46.3: Geometry Forge room generation, Character Forge, Motion Forge and World Forge were accepted but unreachable without deep-importing internals. It is a ROUTING tranche — no subsystem algorithm changed.
 
-It deliberately does NOT implement prefabs, streaming, save games, networking, scene transitions or render batching. See `docs/spec/scene.md` §11.
+It deliberately does NOT expose renderer primitives, character assembly steps or the canonical bone table, and it invented no new package entry point. See `ARCHITECTURE.md` §49.
 
 ### 61.4 What is NOT authorized
 
@@ -1264,9 +1265,7 @@ public surface reconciliation   see 46.3
 prefabs, streaming, save/load, networking, scene transitions
 ```
 
-The baton still moves only after evidence and independent validation justify it. Neither GENERAL-ENGINE-DIRECTION-001 nor SCENE-COMPOSITION-001 has been accepted.
-
-**Acceptance of SCENE-COMPOSITION-001 is additionally blocked on its parent.** The branch descends from `dabd229` (GENERAL-ENGINE-DIRECTION-001), which is itself unvalidated and unmerged; `main` remains at `07e555a`. A scene tranche cannot make its own parent authority accepted.
+The baton still moves only after evidence and independent validation justify it. PUBLIC-SURFACE-001 has not been accepted.
 
 ---
 

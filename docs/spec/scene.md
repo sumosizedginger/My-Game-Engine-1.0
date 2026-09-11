@@ -5,7 +5,7 @@
 | Document class | **EARNED SUBSYSTEM SPECIFICATION** (see `DOCUMENTATION_MAP.md` §2) |
 | Authority | Authoritative within scene composition. Below `CONSTITUTION.md`, `PRD.md` and `ARCHITECTURE.md`. |
 | Earned by | **SCENE-COMPOSITION-001** |
-| Status | **BUILT — AWAITING RE-AUDIT.** Repaired at R1 and R2 after successive independent audits. Not accepted. |
+| Status | **ACCEPTED.** Verified independently at `922f5a1`, merged at `c8afd65`. Repaired at R1 and R2 before acceptance. |
 | Implementing modules | `src/scene/definition.js`, `src/scene/validation.js`, `src/scene/codec.js`, `src/scene/affine.js`, `src/scene/compiler.js`, `src/scene/instance.js`, `src/scene/index.js` |
 | Presentation adapter | `src/render/scene-presentation.js` |
 | Tests | `tests/scene.test.js`, `tests/subterra-cell.test.js`, `tests/scene-browser.test.js` |
