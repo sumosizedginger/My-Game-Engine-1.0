@@ -156,7 +156,7 @@ export async function renderCanonicalViews({
         up: camera?.up ?? null,
         fovDeg: camera?.fovDeg ?? null,
         aspect: camera?.aspect ?? null,
-        occupancy: camera?.occupancy ?? null,
+        projectedBoundsOccupancy: camera?.projectedBoundsOccupancy ?? null,
         // The ACTUAL captured surface, in device pixels and CSS pixels.
         viewport: { width: decoded.width, height: decoded.height },
         surface: {

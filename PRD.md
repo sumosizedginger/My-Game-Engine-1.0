@@ -668,7 +668,7 @@ Detailed admission rules live in `DEPENDENCY_POLICY.md`.
 Unless proven incompatible during bootstrap, use:
 
 ```text
-Node 24.20.0
+Node 24.21.0
 ```
 
 and pin it consistently through repository configuration.

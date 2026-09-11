@@ -63,13 +63,13 @@ test('every view of every shape fills the frame on its binding axis', () => {
     for (const view of CANONICAL_VIEWS) {
       for (const aspect of [1, 16 / 9, 9 / 16]) {
         const camera = solveCanonicalView(view, bounds, { aspect });
-        const binding = Math.max(camera.occupancy.width, camera.occupancy.height);
+        const binding = Math.max(camera.projectedBoundsOccupancy.width, camera.projectedBoundsOccupancy.height);
         assert.ok(
           Math.abs(binding - EXPECTED_FILL) < 1e-6,
           `${label}/${view}@${aspect.toFixed(2)}: binding axis fills ${(binding * 100).toFixed(1)}%, expected ${(EXPECTED_FILL * 100).toFixed(1)}%`
         );
-        assert.ok(camera.occupancy.width <= EXPECTED_FILL + 1e-6, `${label}/${view}: width overflows the frame`);
-        assert.ok(camera.occupancy.height <= EXPECTED_FILL + 1e-6, `${label}/${view}: height overflows the frame`);
+        assert.ok(camera.projectedBoundsOccupancy.width <= EXPECTED_FILL + 1e-6, `${label}/${view}: width overflows the frame`);
+        assert.ok(camera.projectedBoundsOccupancy.height <= EXPECTED_FILL + 1e-6, `${label}/${view}: height overflows the frame`);
       }
     }
   }
@@ -80,7 +80,7 @@ test('a long thin object viewed ALONG its long axis is not a postage stamp', () 
   // bounding-sphere solver framed its front view for the hidden 0.99m depth and
   // reduced the asset to roughly 7% of frame width.
   const front = solveCanonicalView('front', SHAPES.longThin, { aspect: 1 });
-  const binding = Math.max(front.occupancy.width, front.occupancy.height);
+  const binding = Math.max(front.projectedBoundsOccupancy.width, front.projectedBoundsOccupancy.height);
   assert.ok(binding > 0.8, `front view fills only ${(binding * 100).toFixed(1)}%`);
 
   // And the distance must actually be driven by the visible cross-section, not
@@ -93,8 +93,8 @@ test('a long thin object viewed ALONG its long axis is not a postage stamp', () 
 test('a long thin object viewed PERPENDICULAR to its long axis fits its length', () => {
   const side = solveCanonicalView('right', SHAPES.longThin, { aspect: 1 });
   // The 1.0m length runs across the view here, so width is the binding axis.
-  assert.ok(side.occupancy.width > side.occupancy.height);
-  assert.ok(Math.abs(side.occupancy.width - EXPECTED_FILL) < 1e-6);
+  assert.ok(side.projectedBoundsOccupancy.width > side.projectedBoundsOccupancy.height);
+  assert.ok(Math.abs(side.projectedBoundsOccupancy.width - EXPECTED_FILL) < 1e-6);
 });
 
 test('a roughly cubic object frames consistently from every direction', () => {
@@ -108,8 +108,8 @@ test('a roughly cubic object frames consistently from every direction', () => {
 
 test('a tall thin object is framed by its height, not its footprint', () => {
   const front = solveCanonicalView('front', SHAPES.tallThin, { aspect: 1 });
-  assert.ok(front.occupancy.height > front.occupancy.width);
-  assert.ok(Math.abs(front.occupancy.height - EXPECTED_FILL) < 1e-6);
+  assert.ok(front.projectedBoundsOccupancy.height > front.projectedBoundsOccupancy.width);
+  assert.ok(Math.abs(front.projectedBoundsOccupancy.height - EXPECTED_FILL) < 1e-6);
   // Viewed from above, the tall axis is the hidden one and must not drive framing.
   const top = solveCanonicalView('top', SHAPES.tallThin, { aspect: 1 });
   assert.ok(top.distance < front.distance, 'top view should not inherit the tall axis distance');
@@ -119,7 +119,7 @@ test('framing works for non-origin-centred bounds', () => {
   for (const view of CANONICAL_VIEWS) {
     const camera = solveCanonicalView(view, SHAPES.offCentre, { aspect: 1 });
     assert.deepEqual([...camera.target], [...SHAPES.offCentre.center]);
-    const binding = Math.max(camera.occupancy.width, camera.occupancy.height);
+    const binding = Math.max(camera.projectedBoundsOccupancy.width, camera.projectedBoundsOccupancy.height);
     assert.ok(Math.abs(binding - EXPECTED_FILL) < 1e-6, `${view} on off-centre bounds`);
   }
 });
@@ -154,7 +154,7 @@ test('framing is deterministic across repeated solves', () => {
       const b = solveCanonicalView(view, bounds, { aspect: 1.337 });
       assert.deepEqual([...a.position], [...b.position]);
       assert.equal(a.distance, b.distance);
-      assert.equal(a.occupancy.width, b.occupancy.width);
+      assert.equal(a.projectedBoundsOccupancy.width, b.projectedBoundsOccupancy.width);
     }
   }
 });

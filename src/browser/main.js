@@ -358,7 +358,7 @@ if (params.has('preview')) {
     repository: CANONICAL_REPOSITORY,
     timestamp: new Date().toISOString(),
     canonicalToolchainTarget: {
-      node: '24.20.0',
+      node: '24.21.0',
       npm: '11.19.1',
       vite: '8.2.2'
     },

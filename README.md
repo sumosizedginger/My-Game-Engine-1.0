@@ -45,7 +45,7 @@ Proofs pull architecture. We do not build the entire engine first and hope a gam
 
 ## Quick Start
 
-Use Node 24.20.0. From this repository's root, run:
+Use Node 24.21.0. From this repository's root, run:
 
 ```bash
 npm ci
@@ -140,7 +140,7 @@ A tiny exported game should not ship the entire authoring/compiler toolchain by 
 The required toolchain version is:
 
 ```text
-Node 24.20.0
+Node 24.21.0
 ```
 
 Use the commands in [Quick Start](#quick-start) to install, validate, build, and run the current repository.

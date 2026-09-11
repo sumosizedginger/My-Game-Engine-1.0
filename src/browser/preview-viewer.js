@@ -147,7 +147,7 @@ export async function createPreviewViewer(root, { asset = 'cinder' } = {}) {
     up: camera.up,
     fovDeg: camera.fovDeg,
     aspect: camera.aspect,
-    occupancy: camera.occupancy,
+    projectedBoundsOccupancy: camera.projectedBoundsOccupancy,
     viewport: { width: surface.width, height: surface.height }
   }));
 

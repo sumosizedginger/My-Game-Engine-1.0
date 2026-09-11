@@ -87,6 +87,11 @@ If it is not empty, do not delete or overwrite unexplained human work.
 
 # TOOLCHAIN
 
+> **Historical.** This work order is complete and superseded. The Node target
+> below records what Phase 0 was instructed to pin and is retained as evidence,
+> not as a live requirement. The current canonical pin is **Node 24.21.0**; see
+> `README.md`, `PRD.md`, `DEPENDENCY_POLICY.md` and `package.json`.
+
 Target:
 
 `Node 24.19.0`

@@ -237,15 +237,27 @@ export function solveCanonicalView(view, bounds, options = {}) {
       minDepth: projected.minDepth,
       maxDepth: projected.maxDepth
     }),
-    // Fraction of the frame the asset actually occupies. This is the measure
-    // that says whether a canonical view carries information or is a postage
-    // stamp, so it travels with the camera rather than being recomputed.
-    occupancy: Object.freeze(viewOccupancy(bounds, basis, distance, tanH, tanV))
+    // Fraction of the frame spanned by the asset's PROJECTED AXIS-ALIGNED
+    // BOUNDS — not by its rendered pixels. It says whether a canonical view is
+    // framed usefully or is a postage stamp, so it travels with the camera
+    // rather than being recomputed. See projectedBoundsOccupancy for what this
+    // number does and does not claim.
+    projectedBoundsOccupancy: Object.freeze(projectedBoundsOccupancy(bounds, basis, distance, tanH, tanV))
   });
 }
 
 /**
- * Measures how much of the frame an asset occupies from a solved camera.
+ * Measures the fraction of the frame spanned by an asset's PROJECTED
+ * AXIS-ALIGNED BOUNDING BOX from a solved camera.
+ *
+ * This is a framing measurement, not a coverage measurement. It answers "is
+ * the asset sized correctly in frame?" — it does NOT answer "how many pixels
+ * did the asset actually paint?". A thin, hollow or sparse asset can report a
+ * high value here while covering very little of the image, because the bounding
+ * box spans frame area the geometry does not fill.
+ *
+ * Rendered-pixel occupancy is a separate, unimplemented measurement. Do not
+ * read this value as a stand-in for it.
  *
  * @param {object} bounds
  * @param {object} basis
@@ -254,7 +266,7 @@ export function solveCanonicalView(view, bounds, options = {}) {
  * @param {number} tanV
  * @returns {{width: number, height: number}} Fractions in [0, 1].
  */
-export function viewOccupancy(bounds, basis, distance, tanH, tanV) {
+export function projectedBoundsOccupancy(bounds, basis, distance, tanH, tanV) {
   let width = 0;
   let height = 0;
   for (const corner of boundsCorners(bounds)) {
