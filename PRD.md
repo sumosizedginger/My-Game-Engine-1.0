@@ -958,7 +958,7 @@ This does not mean every genre-specific mechanic belongs in engine core. The rul
 
 A capability belongs in the engine when more than one genuinely different consumer needs it and the engine can express it generically. A capability that one game needs belongs to that game until a second consumer proves otherwise.
 
-The largest identified structural gap against this scope was the absence of a general engine-owned scene and composition model. SCENE-COMPOSITION-001 built that foundation; it is **awaiting independent validation and has not been accepted**. See `docs/spec/scene.md` for what exists and §11 of that document for what remains future, `ARCHITECTURE.md` §43 for the boundaries, and `ROADMAP.md` for sequencing.
+The largest identified structural gap against this scope was the absence of a general engine-owned scene and composition model. SCENE-COMPOSITION-001 built that foundation; it is **awaiting independent re-audit and has not been accepted** (its first revision failed validation and was repaired). See `docs/spec/scene.md` for what exists and §11 of that document for what remains future, `ARCHITECTURE.md` §43 for the boundaries, and `ROADMAP.md` for sequencing.
 
 ---
 

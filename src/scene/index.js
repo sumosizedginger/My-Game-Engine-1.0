@@ -44,11 +44,19 @@ export {
 
 export {
   SCENE_ARTIFACT_VERSION,
-  compileScene,
-  composeTransforms,
-  quaternionMultiply,
-  quaternionRotate
+  compileScene
 } from './compiler.js';
+
+// Affine primitives. A compiled world placement is a matrix, so a consumer
+// needs these to do anything with it beyond reading its translation.
+export {
+  identityMatrix,
+  matrixFromTRS,
+  multiplyMatrices,
+  transformPoint,
+  translationOf,
+  hasShear
+} from './affine.js';
 
 export {
   instantiateScene,

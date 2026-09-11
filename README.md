@@ -40,7 +40,7 @@ Accepted implementation now includes:
 - Proof E: Blind API Generality Test (Order Five, a bounded 3D collection/puzzle game).
 
 - AI-ASSET-FOUNDATION-001: engine-owned AI-native asset authoring.
-- SCENE-COMPOSITION-001: scene and composition foundation — **built, awaiting validation**.
+- SCENE-COMPOSITION-001: scene and composition foundation — **built, repaired at R1, awaiting re-audit**.
 
 Proof E is accepted: a fresh blind participant successfully built Order Five through the documented public engine surface without core engine modification or private API bypass. This provides strong evidence of runtime and compiler public coherence, though it represents generality evidence rather than universal genre support.
 
@@ -54,7 +54,7 @@ The engine is additionally intended to become a **publicly released, general-pur
 
 That target is recorded in [PRD.md](PRD.md) Part II and its cross-system boundaries in [ARCHITECTURE.md](ARCHITECTURE.md) Part II.
 
-**Almost none of it is implemented.** Physics, animation graphs, story and quest graphs, timelines, audio, runtime UI, save and persistence, asset import, streaming, networking and accessibility are product *direction*, not capability. Scene composition is the first of them to have a built foundation, and that foundation is awaiting validation rather than accepted. Each is earned by a real forcing consumer and accepted through the normal proof, audit and verification chain. Nothing in this repository should be read as advertising a system that does not exist.
+**Almost none of it is implemented.** Physics, animation graphs, story and quest graphs, timelines, audio, runtime UI, save and persistence, asset import, streaming, networking and accessibility are product *direction*, not capability. Scene composition is the first of them to have a built foundation, and that foundation is awaiting re-audit rather than accepted. Each is earned by a real forcing consumer and accepted through the normal proof, audit and verification chain. Nothing in this repository should be read as advertising a system that does not exist.
 
 ## Quick Start
 

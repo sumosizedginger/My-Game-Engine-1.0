@@ -361,7 +361,7 @@ If any of the earned-tier mitigations is dropped, the tier will rot, and the eng
 
 *Appended, not rewritten. The findings above record what was true at audit time and are left intact; erasing a gap once it is addressed destroys the reasoning that justified addressing it.*
 
-**SCENE-COMPOSITION-001** built the scene and composition foundation that section C.1 named the largest structural blocker and section D called the keystone. It is **BUILT — AWAITING VALIDATION**: not independently validated, not human-accepted, not merged.
+**SCENE-COMPOSITION-001** built the scene and composition foundation that section C.1 named the largest structural blocker and section D called the keystone. It is **BUILT — AWAITING RE-AUDIT**: its first revision failed independent validation on two blocking transform and immutability defects, both repaired at R1 (see `docs/spec/scene.md` §12.1). Not accepted, not merged.
 
 What changed against this audit's findings:
 

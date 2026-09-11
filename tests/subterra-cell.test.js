@@ -23,7 +23,10 @@ import {
   validateSceneDefinition,
   encodeScene,
   sceneHash,
-  instantiateScene
+  instantiateScene,
+  transformPoint,
+  multiplyMatrices,
+  matrixFromTRS
 } from '../src/scene/index.js';
 import { createEntityManager } from '../src/runtime/entities.js';
 import { createTransformManager } from '../src/runtime/transforms.js';
@@ -158,22 +161,49 @@ test('an assembly carries its children: the doorway composes into world space', 
 
 test('a rotated assembly rotates its children', () => {
   // The console is yawed a quarter turn; its screen is tilted within the
-  // console. The screen's world rotation must be neither of those alone.
+  // console. Checked on transformed POINTS rather than a decomposed rotation,
+  // because a composed world placement has no guaranteed TRS decomposition.
   const artifact = compileScene(buildSubterraCellDefinition());
-  const consoleWorld = artifact.nodes.find((n) => n.pid === 'props.console').world;
+  const consoleNode = artifact.nodes.find((n) => n.pid === 'props.console');
   const screen = artifact.nodes.find((n) => n.pid === 'props.console.screen');
 
   assert.notDeepEqual([...screen.local.rotation], [0, 0, 0, 1], 'the screen is tilted locally');
-  assert.notDeepEqual([...screen.world.rotation], [...screen.local.rotation],
-    'the world rotation must include the console yaw');
-  assert.notDeepEqual([...screen.world.rotation], [...consoleWorld.rotation],
-    'the world rotation must include the screen tilt');
 
-  // The screen is offset in the console's own frame, so the yaw moves it in
-  // world space along an axis its local offset never mentions.
+  // The composition law holds for this real assembly: parent world matrix
+  // times child local matrix equals the compiled child world matrix.
+  const childLocal = matrixFromTRS(screen.local);
+  const expected = multiplyMatrices(consoleNode.world.matrix, childLocal);
+  for (let i = 0; i < 16; i++) {
+    assert.ok(Math.abs(screen.world.matrix[i] - expected[i]) < 1e-12, `element ${i}`);
+  }
+
+  // The screen is offset only in the console's local Z, so a yawed parent must
+  // displace it along a world axis its local offset never mentions.
   assert.equal(screen.local.translation[0], 0);
-  assert.ok(Math.abs(screen.world.translation[0] - consoleWorld.translation[0]) > 0.05,
+  assert.ok(Math.abs(screen.world.translation[0] - consoleNode.world.translation[0]) > 0.05,
     'a yawed parent must displace a child that is offset only in local z');
+
+  // The screen's local up is tilted away from world up by the console yaw AND
+  // the screen tilt together, so it matches neither on its own.
+  const screenUp = transformPoint(screen.world.matrix, [0, 1, 0])
+    .map((v, i) => v - screen.world.translation[i]);
+  const consoleUp = transformPoint(consoleNode.world.matrix, [0, 1, 0])
+    .map((v, i) => v - consoleNode.world.translation[i]);
+  assert.ok(Math.hypot(...screenUp.map((v, i) => v - consoleUp[i])) > 1e-3,
+    'the screen tilt must survive composition with the console yaw');
+});
+
+test('the cell contains no shear, and the compiler says so explicitly', () => {
+  // SUBTERRA authors no scale, so nothing in it can shear. Recorded rather
+  // than assumed: if a future edit introduces a nested non-uniform scale, this
+  // is where it becomes visible instead of quietly changing the render.
+  const artifact = compileScene(buildSubterraCellDefinition());
+  assert.equal(artifact.shearedNodeCount, 0);
+  assert.ok(artifact.nodes.every((n) => n.world.sheared === false));
+  assert.ok(
+    artifact.nodes.every((n) => n.local.scale.every((v) => v === 1)),
+    'the cell authors no scale; if that changes, revisit the shear expectation'
+  );
 });
 
 test('one asset is placed many times: the scene composes, it does not copy geometry', () => {

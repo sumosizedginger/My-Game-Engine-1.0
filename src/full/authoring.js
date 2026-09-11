@@ -140,9 +140,19 @@ export {
 
 export {
   SCENE_ARTIFACT_VERSION,
-  compileScene,
-  composeTransforms
+  compileScene
 } from '../scene/compiler.js';
+
+// Affine primitives: a compiled world placement is a matrix, so an authoring
+// consumer needs these to reason about one.
+export {
+  identityMatrix,
+  matrixFromTRS,
+  multiplyMatrices,
+  transformPoint,
+  translationOf,
+  hasShear
+} from '../scene/affine.js';
 
 import { MESH_OP_DESCRIPTORS } from '../geometry/mesh-ops.js';
 import { MESH_IR_VERSION as IR_VERSION, ATTRIBUTE_ITEM_SIZE } from '../geometry/mesh.js';
@@ -211,7 +221,12 @@ export const AUTHORING_SURFACE = Object.freeze({
     holdsGeometry: false,
     serializesRuntimeHandles: false,
     runtimeEntryPoint: 'engine/runtime: instantiateScene',
-    transformOwnership: Object.freeze({ root: 'STATIC', child: 'ATTACHED' })
+    transformOwnership: Object.freeze({ root: 'STATIC', child: 'ATTACHED' }),
+    // Local authoring is TRS; compiled world placement is an affine matrix,
+    // because a composed hierarchy is not always TRS-representable.
+    localTransform: 'TRS: translation, rotation quaternion XYZW, scale',
+    worldTransform: 'affine 4x4, column-major, column vectors',
+    worldComposition: 'worldMatrix = parentWorldMatrix * localMatrix; localMatrix = T * R * S'
   }),
   laws: Object.freeze([
     'Every asset part requires a semanticName. Anonymous parts are refused.',
@@ -220,6 +235,8 @@ export const AUTHORING_SURFACE = Object.freeze({
     'The preview budget fails closed.',
     'Topology-aware operations (bevel, boolean, subdivision, remesh) are not available in this tranche.',
     'A scene is engine data, never a renderer scene graph. It holds no geometry.',
+    'Compiled world placement is an affine matrix. It is not decomposed into rotation and scale, because a sheared hierarchy has no such decomposition.',
+    'A compiled artifact owns and deep-freezes its data; mutating the source definition afterwards cannot change it.',
     'Scene persistent ids belong to the source. Runtime entity handles are never serialized.',
     'Scene hierarchy is a forest: duplicate ids, missing parents, self-parents and cycles are refused.'
   ])

@@ -15,11 +15,17 @@
  *
  * This file is allowed to import 'three'. `src/scene/**` is not.
  *
- * FLAT OBJECT TREE. Nodes are added as siblings under one group, each placed
- * at its already-derived WORLD transform, rather than mirrored into a nested
+ * FLAT OBJECT TREE. Nodes are added as siblings under one group, each carrying
+ * its already-composed WORLD MATRIX, rather than mirrored into a nested
  * Object3D hierarchy. The scene compiler has already composed the hierarchy;
  * rebuilding it in the renderer would create a second place where parent-child
  * composition happens, and therefore a second chance for the two to disagree.
+ *
+ * THE MATRIX IS INSTALLED, NEVER DECOMPOSED. A hierarchy nesting non-uniform
+ * scale above a rotation produces shear, which has no translation/rotation/
+ * scale decomposition. Correct compiler math followed by a decomposing
+ * renderer would leave the visible bug alive, so `object.matrix` is set from
+ * the compiled matrix and `matrixAutoUpdate` is turned off.
  *
  * Geometry and materials are shared per asset key and per material id: a cell
  * that places the same crate twice uploads one crate. This is resource
@@ -27,7 +33,7 @@
  * and is not started here.
  */
 
-import { Group, Mesh, Quaternion, Vector3 } from 'three';
+import { Group, Mesh } from 'three';
 import { toBufferGeometry } from './mesh-adapter.js';
 import { compileMaterial } from '../material/compiler.js';
 
@@ -95,10 +101,6 @@ export function createScenePresentation({ instance, assets, materials = [] }) {
     };
   };
 
-  const position = new Vector3();
-  const quaternion = new Quaternion();
-  const scale = new Vector3();
-
   for (const member of instance.members()) {
     if (!member.asset) continue;
 
@@ -118,13 +120,18 @@ export function createScenePresentation({ instance, assets, materials = [] }) {
     const object = new Mesh(entry.geometry, entry.materials.length === 1 ? entry.materials[0] : entry.materials);
     object.name = member.pid;
 
-    // The world transform already carries the full composed placement.
-    position.set(...member.world.translation);
-    quaternion.set(...member.world.rotation);
-    scale.set(...member.world.scale);
-    object.position.copy(position);
-    object.quaternion.copy(quaternion);
-    object.scale.copy(scale);
+    // THE COMPILED MATRIX IS INSTALLED DIRECTLY. It is never decomposed into
+    // position/quaternion/scale: a hierarchy nesting non-uniform scale above a
+    // rotation produces shear, which has no TRS decomposition, so decomposing
+    // here would quietly discard the very thing the compiler got right.
+    //
+    // matrixAutoUpdate is disabled because Three.js would otherwise recompose
+    // `object.matrix` from its own position/quaternion/scale on the next
+    // update and overwrite what we installed. The scene compiler is the
+    // authority for placement; the renderer is a consumer.
+    object.matrixAutoUpdate = false;
+    object.matrix.fromArray(member.world.matrix);
+    object.matrixWorldNeedsUpdate = true;
 
     // Scene identity travels with the renderer object, so a picked mesh can be
     // resolved back to the authored node without a side table.
@@ -135,7 +142,8 @@ export function createScenePresentation({ instance, assets, materials = [] }) {
       parentPid: member.parent,
       depth: member.depth,
       tags: member.tags,
-      asset: member.asset
+      asset: member.asset,
+      sheared: member.world.sheared
     };
 
     root.add(object);

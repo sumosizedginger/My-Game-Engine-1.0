@@ -24,11 +24,20 @@ import { createEntityManager } from '../runtime/entities.js';
 import { createTransformManager } from '../runtime/transforms.js';
 import { createScenePresentation, liveScenePresentationCount } from '../render/scene-presentation.js';
 import { buildSubterraCell } from '../../examples/scenes/subterra-cell/scene.js';
+import { buildAffineProbe } from '../../examples/scenes/affine-probe/scene.js';
 import './scene.css';
 
-/** Scenes this viewer can show. */
+/**
+ * Scenes this viewer can show.
+ *
+ * `affineProbe` is a transform FIXTURE, not content. SUBTERRA authors no
+ * scale and therefore cannot shear, so it cannot detect a renderer that
+ * decomposes world placement back into translation/rotation/scale. The probe
+ * can.
+ */
 const SCENE_BUILDERS = {
-  subterra: buildSubterraCell
+  subterra: buildSubterraCell,
+  affineProbe: buildAffineProbe
 };
 
 const GROUND_COLOR = 0x14161a;
@@ -142,6 +151,7 @@ export function createSceneViewer(app, { scene: sceneKey = 'subterra' } = {}) {
       <div><dt>Artifact hash</dt><dd><code>${artifact.artifactHash}</code></dd></div>
       <div><dt>Authored nodes</dt><dd>${artifact.nodeCount}</dd></div>
       <div><dt>Max depth</dt><dd>${artifact.maxDepth}</dd></div>
+      <div><dt>Sheared nodes</dt><dd>${artifact.shearedNodeCount}</dd></div>
       <div><dt>Runtime entities</dt><dd>${loaded ? instance.size : 0}</dd></div>
       <div><dt>Renderer objects</dt><dd>${loaded ? presentation.objectCount : 0}</dd></div>
       <div><dt>Uploaded geometries</dt><dd>${loaded ? presentation.geometryCount : 0}</dd></div>
@@ -295,6 +305,8 @@ export function createSceneViewer(app, { scene: sceneKey = 'subterra' } = {}) {
         artifactHash: artifact.artifactHash,
         nodeCount: artifact.nodeCount,
         maxDepth: artifact.maxDepth,
+        shearedNodeCount: artifact.shearedNodeCount,
+        artifactVersion: artifact.artifactVersion,
         roots: [...artifact.roots]
       };
     },
@@ -310,9 +322,11 @@ export function createSceneViewer(app, { scene: sceneKey = 'subterra' } = {}) {
         asset: member.asset,
         handle: member.handle ? { index: member.handle.index, generation: member.handle.generation } : null,
         world: {
+          // The matrix is authoritative; translation is read out of it. There
+          // is no rotation or scale, because a sheared placement has none.
+          matrix: [...member.world.matrix],
           translation: [...member.world.translation],
-          rotation: [...member.world.rotation],
-          scale: [...member.world.scale]
+          sheared: member.world.sheared
         }
       }));
     },

@@ -86,7 +86,9 @@ const ALLOWED_FULL_ADDITIONS = new Set([
   'createSceneNode', 'createSceneDefinition',
   'validateSceneDefinition', 'enforceValidSceneDefinition',
   'SCENE_CODEC_VERSION', 'SCENE_CODEC_MAGIC', 'encodeScene', 'decodeScene', 'sceneHash',
-  'SCENE_ARTIFACT_VERSION', 'compileScene', 'composeTransforms'
+  'SCENE_ARTIFACT_VERSION', 'compileScene',
+  'identityMatrix', 'matrixFromTRS', 'multiplyMatrices', 'transformPoint',
+  'translationOf', 'hasShear'
 ]);
 
 /**
@@ -111,6 +113,7 @@ const RENDERER_INDEPENDENT_MODULES = [
   'src/scene/codec.js',
   'src/scene/compiler.js',
   'src/scene/instance.js',
+  'src/scene/affine.js',
   'src/scene/index.js'
 ];
 

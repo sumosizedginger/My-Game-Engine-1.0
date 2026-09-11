@@ -1429,11 +1429,11 @@ If a simpler design survives the same proofs and preserves the Constitution, pre
 
 ## 43. Scene and Composition Architecture
 
-### FOUNDATION BUILT — AWAITING VALIDATION
+### FOUNDATION BUILT — AWAITING RE-AUDIT
 
-SCENE-COMPOSITION-001 implemented the foundation. It has **not** been independently validated or human-accepted, and must not be described as ACCEPTED until it is.
+SCENE-COMPOSITION-001 implemented the foundation. Independent validation failed its first revision on two blocking defects, both repaired at R1 (see `docs/spec/scene.md` §12.1). It has **not** been re-audited or human-accepted, and must not be described as ACCEPTED until it is.
 
-**What now exists.** `SceneDefinition` (source) compiles to a frozen `SceneArtifact` and instantiates into a `SceneInstance`: persistent authored identity, hierarchy, local transforms, derived world composition, deterministic canonical serialization, immutable artifact identity, runtime entity mapping, clean unload and reload, independent instances, structured diagnostics, and a supported public API split across `engine/runtime` and `engine/full`. Its forcing consumer is the SUBTERRA cell, a 37-node constructed environment. The subsystem specification is `docs/spec/scene.md`.
+**What now exists.** `SceneDefinition` (source) compiles to a deep-frozen `SceneArtifact` and instantiates into a `SceneInstance`: persistent authored identity, hierarchy, local transforms, derived world composition as affine matrices, deterministic canonical serialization, immutable artifact identity, runtime entity mapping, clean unload and reload, independent instances, structured diagnostics, and a supported public API split across `engine/runtime` and `engine/full`. Its forcing consumer is the SUBTERRA cell, a 37-node constructed environment. The subsystem specification is `docs/spec/scene.md`.
 
 **What remains future**, and is deliberately absent: prefabs, reparenting, scene transitions, streaming and chunking, save-game persistence, networking, live hierarchy mutation after compilation, and spatial indexing. See `docs/spec/scene.md` §11.
 
@@ -1471,6 +1471,17 @@ Two findings from SCENE-COMPOSITION-001 are durable enough to record here rather
 **`ATTACHED` was already the right mechanism.** `GAMEPLAY_FOUNDATION.md` §3.1 defines `TRANSFORM_OWNERSHIP.ATTACHED` as "derives world transform hierarchically from a parent entity". It existed and was unused. Scene composition uses it for parented nodes and `STATIC` for roots, so hierarchy introduced no new ownership mode and no second per-tick transform writer. The scene publishes derived world *position* into the existing transform manager once, at instantiation.
 
 **Rotation and scale stayed out of the runtime transform.** The runtime `Transform` record owns position and velocity. Scene composition did not extend it; full placement is read from derived artifact data instead. Extending the runtime transform is transform-architecture work and needs its own authorization.
+
+**A composed world placement is an affine matrix, not a TRS.** This is durable architecture rather than a scene detail, because it constrains every future consumer of composed placement — streaming, physics, Studio inspection and networking all inherit it.
+
+```text
+localMatrix      = T * R * S
+worldMatrix      = parentWorldMatrix * localMatrix
+```
+
+Local authoring stays TRS, because that is how a human or an AI describes a placement. Composed placement cannot: nesting a non-uniform scale above a rotation produces shear, which has no translation/rotation/scale decomposition. An engine that stores composed placement as TRS is wrong for those hierarchies and cannot be made right without changing the representation. The convention (column vectors, column-major storage) is documented in `src/scene/affine.js` and asserted by test rather than left to be inferred.
+
+The corollary binds the renderer too: a presentation layer must **install** the composed matrix rather than decompose it, or correct compiler math is discarded at the last step and the visible bug survives.
 
 ### 43.4 What must not be done yet
 

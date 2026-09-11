@@ -7,110 +7,100 @@
  *
  *   SceneDefinition -> compileScene() -> SceneArtifact -> instantiateScene()
  *
- * The compiler validates, establishes a canonical hierarchy order, derives
- * world transforms from local ones, and freezes the result. It does NOT
- * render, own GPU resources, run gameplay, or hold mutable state between
- * calls. It is not a service locator and it is not Kiln: Kiln is the
- * engine-wide compile/bake system (ARCHITECTURE.md §6) and remains unbuilt.
+ * The compiler validates, takes an owned snapshot of the source, establishes a
+ * canonical hierarchy order, derives world matrices from local ones, and deep
+ * freezes the result. It does NOT render, own GPU resources, run gameplay, or
+ * hold mutable state between calls. It is not a service locator and it is not
+ * Kiln: Kiln is the engine-wide compile/bake system (ARCHITECTURE.md §6) and
+ * remains unbuilt.
  *
- * WORLD TRANSFORM COMPOSITION follows the same order `transformMesh` uses for
- * geometry — scale, then rotate, then translate:
+ * WORLD COMPOSITION IS MATRIX COMPOSITION.
  *
- *   worldScale       = parentScale * localScale
- *   worldRotation    = parentRotation * localRotation
- *   worldTranslation = parentTranslation
- *                    + rotate(parentRotation, parentScale * localTranslation)
+ *   localMatrix = T * R * S
+ *   worldMatrix = parentWorldMatrix * localMatrix
+ *   root worldMatrix = localMatrix
  *
- * Reusing that order is deliberate: a node's world placement must agree with
- * what the same TRS would have done to a mesh.
+ * This replaced an independent-TRS composition that was mathematically wrong
+ * whenever non-uniform scale and rotation appeared at different levels. It
+ * lost the ordering between a parent's scale and a parent's rotation, and it
+ * could not represent shear at all. See src/scene/affine.js for the defect,
+ * the convention and the reproduction.
+ *
+ * The matrix is AUTHORITATIVE. `world.translation` is derived convenience data
+ * read straight out of it. There is deliberately no `world.rotation` or
+ * `world.scale`: for a hierarchy containing shear those values do not exist,
+ * and publishing them would be a confident lie.
+ *
+ * THE ARTIFACT OWNS ITS DATA. Everything reachable from an artifact is copied
+ * from the source and deep frozen, because a caller may legitimately pass a
+ * plain mutable object — `decodeScene` output, an imported scene, a hand-built
+ * definition — and a compiled artifact whose contents can change afterwards
+ * while its hash does not is not an artifact.
  *
  * This module must never import 'three'.
  */
 
 import { normalizeZero } from '../geometry/mesh.js';
-import { IDENTITY_TRANSFORM, SCENE_DEFINITION_VERSION } from './definition.js';
+import { SCENE_DEFINITION_VERSION } from './definition.js';
 import { enforceValidSceneDefinition } from './validation.js';
 import { encodeScene, hashTextBytes, sceneHash, SCENE_CODEC_VERSION } from './codec.js';
-
-/** Compiled scene artifact version. Bump on any artifact shape change. */
-export const SCENE_ARTIFACT_VERSION = 1;
-
-/**
- * Hamilton product of two XYZW quaternions.
- *
- * Renormalized because repeated composition down a deep hierarchy accumulates
- * magnitude drift. `Math.sqrt` is IEEE-754 exact per the ECMAScript
- * specification, so this stays deterministic across conforming runtimes.
- *
- * @param {Array<number>} a
- * @param {Array<number>} b
- * @returns {Array<number>} Normalized quaternion XYZW.
- */
-export function quaternionMultiply(a, b) {
-  const [ax, ay, az, aw] = a;
-  const [bx, by, bz, bw] = b;
-  const x = aw * bx + ax * bw + ay * bz - az * by;
-  const y = aw * by - ax * bz + ay * bw + az * bx;
-  const z = aw * bz + ax * by - ay * bx + az * bw;
-  const w = aw * bw - ax * bx - ay * by - az * bz;
-  const length = Math.sqrt(x * x + y * y + z * z + w * w) || 1;
-  return [
-    normalizeZero(x / length),
-    normalizeZero(y / length),
-    normalizeZero(z / length),
-    normalizeZero(w / length)
-  ];
-}
+import {
+  identityMatrix,
+  matrixFromTRS,
+  multiplyMatrices,
+  transformPoint,
+  translationOf,
+  hasShear
+} from './affine.js';
 
 /**
- * Rotates a vector by an XYZW quaternion.
+ * Compiled scene artifact version.
  *
- * Same formulation as `transformMesh`, so scene placement and geometry
- * transformation cannot drift apart.
- *
- * @param {Array<number>} q - Quaternion XYZW.
- * @param {Array<number>} v - Vector.
- * @returns {Array<number>} Rotated vector.
+ * 2 — world placement became an authoritative affine matrix. Version 1 exposed
+ *     `world.rotation` and `world.scale`, which are not generally derivable
+ *     from a composed hierarchy.
  */
-export function quaternionRotate(q, v) {
-  const [qx, qy, qz, qw] = q;
-  const [x, y, z] = v;
-  const tx = 2 * (qy * z - qz * y);
-  const ty = 2 * (qz * x - qx * z);
-  const tz = 2 * (qx * y - qy * x);
-  return [
-    normalizeZero(x + qw * tx + (qy * tz - qz * ty)),
-    normalizeZero(y + qw * ty + (qz * tx - qx * tz)),
-    normalizeZero(z + qw * tz + (qx * ty - qy * tx))
-  ];
-}
+export const SCENE_ARTIFACT_VERSION = 2;
 
 /**
- * Composes a parent world transform with a child local transform.
+ * Copies an authored TRS into artifact-owned frozen arrays.
  *
- * @param {object} parent - World TRS.
- * @param {object} local - Local TRS.
- * @returns {object} Frozen world TRS.
+ * @param {object} transform
+ * @returns {object} Frozen local TRS.
  */
-export function composeTransforms(parent, local) {
-  const scaled = [
-    parent.scale[0] * local.translation[0],
-    parent.scale[1] * local.translation[1],
-    parent.scale[2] * local.translation[2]
-  ];
-  const rotated = quaternionRotate(parent.rotation, scaled);
+function ownedTransform(transform) {
   return Object.freeze({
-    translation: Object.freeze([
-      normalizeZero(parent.translation[0] + rotated[0]),
-      normalizeZero(parent.translation[1] + rotated[1]),
-      normalizeZero(parent.translation[2] + rotated[2])
-    ]),
-    rotation: Object.freeze(quaternionMultiply(parent.rotation, local.rotation)),
-    scale: Object.freeze([
-      normalizeZero(parent.scale[0] * local.scale[0]),
-      normalizeZero(parent.scale[1] * local.scale[1]),
-      normalizeZero(parent.scale[2] * local.scale[2])
-    ])
+    translation: Object.freeze(transform.translation.map((n) => normalizeZero(Number(n)))),
+    rotation: Object.freeze(transform.rotation.map((n) => normalizeZero(Number(n)))),
+    scale: Object.freeze(transform.scale.map((n) => normalizeZero(Number(n))))
+  });
+}
+
+/**
+ * Takes an owned, frozen snapshot of a validated definition.
+ *
+ * Every mutable container the artifact will retain is copied here, once, so
+ * nothing downstream aliases caller memory. Strings and numbers are immutable
+ * already and are not cloned.
+ *
+ * @param {object} definition - Validated SceneDefinition.
+ * @returns {object} Frozen snapshot.
+ */
+function snapshotDefinition(definition) {
+  return Object.freeze({
+    version: definition.version,
+    id: definition.id,
+    units: definition.units,
+    upAxis: definition.upAxis,
+    forwardAxis: definition.forwardAxis,
+    nodes: Object.freeze(definition.nodes.map((node) => Object.freeze({
+      pid: node.pid,
+      name: node.name,
+      parent: node.parent === undefined ? null : node.parent,
+      asset: node.asset === undefined ? null : node.asset,
+      tags: Object.freeze([...node.tags].map(String)),
+      transform: ownedTransform(node.transform)
+    })))
   });
 }
 
@@ -150,21 +140,30 @@ function canonicalOrder(nodes) {
  * Compiles a scene definition into an immutable artifact.
  *
  * @param {object} definition - SceneDefinition.
- * @returns {object} Frozen SceneArtifact.
+ * @returns {object} Deep-frozen SceneArtifact.
  */
 export function compileScene(definition) {
   enforceValidSceneDefinition(definition);
 
-  const ordered = canonicalOrder(definition.nodes);
-  const world = new Map();
+  // Snapshot BEFORE anything is derived. From here on the caller's object is
+  // never read again, so mutating it cannot reach the artifact.
+  const source = snapshotDefinition(definition);
+
+  const ordered = canonicalOrder(source.nodes);
+  const worldMatrices = new Map();
   const depths = new Map();
   const childPids = new Map();
   const compiled = [];
 
   ordered.forEach((node, index) => {
-    const parentWorld = node.parent === null ? IDENTITY_TRANSFORM : world.get(node.parent);
-    const nodeWorld = composeTransforms(parentWorld, node.transform);
-    world.set(node.pid, nodeWorld);
+    const localMatrix = matrixFromTRS(node.transform);
+    const parentMatrix = node.parent === null ? identityMatrix() : worldMatrices.get(node.parent);
+    // worldMatrix = parentWorld * local. Column vectors, so `local` applies
+    // to a point first and the parent chain applies outward from there.
+    const worldMatrix = node.parent === null
+      ? localMatrix
+      : multiplyMatrices(parentMatrix, localMatrix);
+    worldMatrices.set(node.pid, worldMatrix);
 
     // Canonical order guarantees the parent was visited first.
     const depth = node.parent === null ? 0 : depths.get(node.parent) + 1;
@@ -182,9 +181,18 @@ export function compileScene(definition) {
       asset: node.asset,
       tags: node.tags,
       index,
-      depth: depth,
+      depth,
       local: node.transform,
-      world: nodeWorld
+      localMatrix: Object.freeze(localMatrix),
+      world: Object.freeze({
+        // AUTHORITATIVE. Column-major, column vectors. See src/scene/affine.js.
+        matrix: Object.freeze(worldMatrix),
+        // Derived: where the matrix places this node's local origin.
+        translation: Object.freeze(translationOf(worldMatrix)),
+        // Recorded rather than hidden. A sheared node has no TRS decomposition,
+        // and a consumer that assumed one would be silently wrong.
+        sheared: hasShear(worldMatrix)
+      })
     });
   });
 
@@ -195,33 +203,33 @@ export function compileScene(definition) {
     children: Object.freeze([...(childPids.get(node.pid) ?? [])])
   }));
 
-  const sourceText = encodeScene(definition);
-  const sourceHash = hashTextBytes(sourceText);
+  const sourceHash = hashTextBytes(encodeScene(source));
 
   const artifact = {
     artifactVersion: SCENE_ARTIFACT_VERSION,
     definitionVersion: SCENE_DEFINITION_VERSION,
     codecVersion: SCENE_CODEC_VERSION,
-    id: definition.id,
-    units: definition.units,
-    upAxis: definition.upAxis,
-    forwardAxis: definition.forwardAxis,
+    id: source.id,
+    units: source.units,
+    upAxis: source.upAxis,
+    forwardAxis: source.forwardAxis,
     sourceHash,
     nodes: Object.freeze(nodes),
     order: Object.freeze(nodes.map((n) => n.pid)),
     roots: Object.freeze(nodes.filter((n) => n.parent === null).map((n) => n.pid)),
     nodeCount: nodes.length,
-    maxDepth: nodes.reduce((max, n) => Math.max(max, n.depth), 0)
+    maxDepth: nodes.reduce((max, n) => Math.max(max, n.depth), 0),
+    shearedNodeCount: nodes.filter((n) => n.world.sheared).length
   };
 
-  // Artifact identity covers the compiled result, not just the source, so a
-  // compiler change that alters derived world transforms is visible as a
-  // different artifact even though the source is untouched.
+  // Artifact identity covers the compiled world MATRICES, because those are
+  // what actually define placement. Hashing derived translation alone would
+  // miss a compiler change that rotated or sheared every node in place.
   artifact.artifactHash = hashTextBytes(JSON.stringify({
     artifactVersion: artifact.artifactVersion,
     sourceHash,
     order: [...artifact.order],
-    world: nodes.map((n) => [n.pid, [...n.world.translation], [...n.world.rotation], [...n.world.scale]])
+    world: nodes.map((n) => [n.pid, [...n.world.matrix]])
   }));
 
   return Object.freeze(artifact);
@@ -234,3 +242,9 @@ export function compileScene(definition) {
  * @returns {string} Hex fingerprint.
  */
 export { sceneHash };
+
+/**
+ * Re-exported so consumers of a compiled scene can work with its matrices
+ * without reaching for a private module.
+ */
+export { transformPoint, multiplyMatrices, identityMatrix, matrixFromTRS, translationOf, hasShear };

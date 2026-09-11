@@ -27,8 +27,9 @@
  *
  * Rotation and scale are deliberately NOT pushed into the transform record,
  * because the runtime Transform owns position and velocity only. Consumers
- * needing full placement read `worldTransformOf(pid)`, which is derived
- * artifact data rather than a competing mutable transform store.
+ * needing full placement read `worldMatrixOf(pid)`, which is derived artifact
+ * data rather than a competing mutable transform store. The published position
+ * is read out of that authoritative matrix, so the two can never disagree.
  *
  * NO SINGLETON. Every instance owns its own maps. Two instances of the same
  * artifact are fully independent, and disposing one cannot disturb the other.
@@ -36,6 +37,7 @@
  * This module must never import 'three'.
  */
 
+import { transformPoint } from './affine.js';
 import { createEntityManager } from '../runtime/entities.js';
 import { createTransformManager, TRANSFORM_OWNERSHIP } from '../runtime/transforms.js';
 import { createDiagnostic } from '../runtime/index.js';
@@ -136,12 +138,11 @@ export function instantiateScene(artifact, { entityManager = null, transformMana
     handleByPid.set(node.pid, handle);
     pidByHandle.set(handleKey(handle), node.pid);
 
+    // Position comes from the authoritative world matrix rather than from a
+    // parallel value, so there is one source of placement truth.
+    const [wx, wy, wz] = transformPoint(node.world.matrix, [0, 0, 0]);
     transforms.setTransform(handle, {
-      position: {
-        x: node.world.translation[0],
-        y: node.world.translation[1],
-        z: node.world.translation[2]
-      },
+      position: { x: wx, y: wy, z: wz },
       // A parented node's world transform is derived from its parent, which is
       // exactly what ATTACHED means. Roots are immovable scenery.
       ownership: node.parent === null ? TRANSFORM_OWNERSHIP.STATIC : TRANSFORM_OWNERSHIP.ATTACHED
@@ -254,15 +255,31 @@ export function instantiateScene(artifact, { entityManager = null, transformMana
     },
 
     /**
-     * Derived world transform for a persistent id.
+     * Derived world placement for a persistent id.
      *
-     * This is composition-derived artifact data, not a mutable transform.
+     * Composition-derived artifact data, not a mutable transform. The shape is
+     * `{ matrix, translation, sheared }`, where `matrix` is authoritative and
+     * `translation` is read out of it. There is no `rotation` or `scale`: a
+     * sheared hierarchy has no TRS decomposition and claiming one would be
+     * false.
      *
      * @param {string} pid
-     * @returns {object|null} Frozen world TRS, or null.
+     * @returns {object|null} Frozen world placement, or null.
      */
     worldTransformOf(pid) {
       return this.nodeFor(pid)?.world ?? null;
+    },
+
+    /**
+     * Authoritative world matrix for a persistent id.
+     *
+     * Column-major, column vectors. See src/scene/affine.js for the convention.
+     *
+     * @param {string} pid
+     * @returns {Array<number>|null} Frozen 16-element matrix, or null.
+     */
+    worldMatrixOf(pid) {
+      return this.nodeFor(pid)?.world.matrix ?? null;
     },
 
     /**

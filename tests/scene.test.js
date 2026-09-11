@@ -25,8 +25,12 @@ import {
   decodeScene,
   sceneHash,
   compileScene,
-  composeTransforms,
-  quaternionMultiply,
+  identityMatrix,
+  matrixFromTRS,
+  multiplyMatrices,
+  transformPoint,
+  translationOf,
+  hasShear,
   instantiateScene,
   liveSceneInstanceCount
 } from '../src/scene/index.js';
@@ -264,7 +268,7 @@ test('serialized scene text contains no runtime handle', () => {
   instance.dispose();
 });
 
-test('artifact identity is deterministic and covers derived world transforms', () => {
+test('artifact identity is deterministic and covers derived world matrices', () => {
   const a = compileScene(sampleDefinition());
   const b = compileScene(sampleDefinition());
   assert.equal(a.sourceHash, b.sourceHash);
@@ -314,22 +318,23 @@ test('parent rotation carries its children around with it', () => {
 });
 
 test('rotations compose, they do not replace', () => {
+  // Two quarter turns about Y must land a +X offset on -X, not back on +X.
   const definition = createSceneDefinition({
     id: 'rot2',
     nodes: [
       createSceneNode({ pid: 'a', name: 'A', transform: { rotation: rotY(Math.PI / 2) } }),
-      createSceneNode({ pid: 'b', name: 'B', parent: 'a', transform: { rotation: rotY(Math.PI / 2) } })
+      createSceneNode({ pid: 'b', name: 'B', parent: 'a', transform: { rotation: rotY(Math.PI / 2) } }),
+      createSceneNode({ pid: 'c', name: 'C', parent: 'b', transform: { translation: [1, 0, 0] } })
     ]
   });
-  const b = compileScene(definition).nodes.find((n) => n.pid === 'b').world;
-  const expected = rotY(Math.PI);
-  for (let i = 0; i < 4; i++) {
-    assert.ok(Math.abs(b.rotation[i] - expected[i]) < 1e-12,
-      `component ${i}: ${b.rotation[i]} vs ${expected[i]}`);
-  }
+  const world = compileScene(definition).nodes.find((n) => n.pid === 'c').world;
+  const p = transformPoint(world.matrix, [0, 0, 0]);
+  assert.ok(Math.abs(p[0] + 1) < 1e-12, `x ${p[0]}`);
+  assert.ok(Math.abs(p[1]) < 1e-12);
+  assert.ok(Math.abs(p[2]) < 1e-12);
 });
 
-test('parent scale multiplies and scales child offsets', () => {
+test('parent scale scales child offsets', () => {
   const definition = createSceneDefinition({
     id: 'scaled',
     nodes: [
@@ -340,10 +345,11 @@ test('parent scale multiplies and scales child offsets', () => {
   const c = compileScene(definition).nodes.find((n) => n.pid === 'c').world;
   // The child's offset is expressed in the parent's scaled frame.
   assert.deepEqual([...c.translation], [2, 0, 0]);
-  assert.deepEqual([...c.scale], [6, 2, 2]);
+  // A point one unit along the child's local +X is scaled by 2 * 3.
+  assert.deepEqual(transformPoint(c.matrix, [1, 0, 0]), [8, 0, 0]);
 });
 
-test('multi-level hierarchy composes to the same result as manual composition', () => {
+test('multi-level hierarchy matches matrices multiplied by hand', () => {
   const chain = [
     { translation: [1, 0, 0], rotation: rotY(0.3), scale: [1.5, 1, 1] },
     { translation: [0, 2, 0], rotation: rotY(-0.7), scale: [1, 2, 1] },
@@ -359,13 +365,15 @@ test('multi-level hierarchy composes to the same result as manual composition', 
   const artifact = compileScene(definition);
   assert.equal(artifact.maxDepth, 3);
 
-  let expected = IDENTITY_TRANSFORM;
-  for (const step of chain) expected = composeTransforms(expected, createLocalTransform(step));
+  let expected = identityMatrix();
+  for (const step of chain) {
+    expected = multiplyMatrices(expected, matrixFromTRS(createLocalTransform(step)));
+  }
 
-  const actual = artifact.nodes.find((n) => n.pid === 'n3').world;
-  for (let i = 0; i < 3; i++) {
-    assert.ok(Math.abs(actual.translation[i] - expected.translation[i]) < 1e-12);
-    assert.ok(Math.abs(actual.scale[i] - expected.scale[i]) < 1e-12);
+  const actual = artifact.nodes.find((n) => n.pid === 'n3').world.matrix;
+  for (let i = 0; i < 16; i++) {
+    assert.ok(Math.abs(actual[i] - expected[i]) < 1e-12,
+      `matrix element ${i}: ${actual[i]} vs ${expected[i]}`);
   }
 });
 
@@ -399,10 +407,23 @@ test('the compiled artifact records children, roots and depth', () => {
   assert.equal(artifact.nodeCount, 4);
 });
 
-test('quaternion composition stays normalized down a deep chain', () => {
-  let q = [0, 0, 0, 1];
-  for (let i = 0; i < 200; i++) q = quaternionMultiply(q, rotY(0.37));
-  assert.ok(Math.abs(Math.hypot(...q) - 1) < 1e-9, `length ${Math.hypot(...q)}`);
+test('a long rotation-only chain does not drift in scale', () => {
+  // 200 nested quarter-ish turns. A rotation-only chain must stay a rotation:
+  // basis columns of unit length, so nothing silently grows or shrinks.
+  const nodes = [];
+  for (let i = 0; i < 200; i++) {
+    nodes.push(createSceneNode({
+      pid: `n${i}`, name: `N${i}`, parent: i === 0 ? null : `n${i - 1}`,
+      transform: { rotation: rotY(0.37) }
+    }));
+  }
+  const last = compileScene(createSceneDefinition({ id: 'chain', nodes }))
+    .nodes.find((n) => n.pid === 'n199').world.matrix;
+
+  for (const col of [[last[0], last[1], last[2]], [last[4], last[5], last[6]], [last[8], last[9], last[10]]]) {
+    assert.ok(Math.abs(Math.hypot(...col) - 1) < 1e-9, `basis column length ${Math.hypot(...col)}`);
+  }
+  assert.equal(hasShear(last), false, 'a rotation-only chain cannot shear');
 });
 
 // ---------------------------------------------------------------------------
@@ -455,19 +476,32 @@ test('scene registration respects transform authority', () => {
   instance.dispose();
 });
 
-test('rotation and scale stay in scene composition, not in the runtime transform', () => {
+test('orientation stays in scene composition, not in the runtime transform', () => {
   // The runtime Transform owns position and velocity. Scene composition must
   // not smuggle a second transform representation into it.
   const instance = instantiateScene(compileScene(sampleDefinition()));
   const record = instance.transforms.getTransform(instance.handleFor('lamp'));
   assert.equal(record.rotation, undefined);
   assert.equal(record.scale, undefined);
+  assert.equal(record.matrix, undefined);
 
   // Full placement is available from the scene, as derived artifact data.
   const world = instance.worldTransformOf('lamp');
-  assert.equal(world.rotation.length, 4);
-  assert.equal(world.scale.length, 3);
+  assert.equal(world.matrix.length, 16);
+  assert.equal(world.translation.length, 3);
   assert.ok(Object.isFrozen(world));
+  assert.ok(Object.isFrozen(world.matrix));
+
+  // And there is deliberately NO world rotation or scale: a sheared hierarchy
+  // has no such decomposition, so publishing one would be a confident lie.
+  assert.equal(world.rotation, undefined);
+  assert.equal(world.scale, undefined);
+
+  // The published runtime position is exactly what the matrix says.
+  assert.deepEqual(
+    [record.position.x, record.position.y, record.position.z],
+    transformPoint(instance.worldMatrixOf('lamp'), [0, 0, 0])
+  );
   instance.dispose();
 });
 
@@ -727,4 +761,360 @@ test('an INFO diagnostic records the instantiation', () => {
   assert.equal(diagnostics[0].severity, 'INFO');
   assert.equal(diagnostics[0].data.nodes, 4);
   instance.dispose();
+});
+
+// ---------------------------------------------------------------------------
+// AFFINE HIERARCHY — SCENE-COMPOSITION-001 REPAIR R1
+//
+// The original compiler composed world placement as three independent parts:
+//
+//   worldScale       = parentScale * localScale
+//   worldRotation    = parentRotation * localRotation
+//   worldTranslation = parentTranslation + rotate(parentRotation,
+//                                                 parentScale * localTranslation)
+//
+// That loses the ordering between a parent's scale and a parent's rotation,
+// and it cannot represent shear at all. These tests compare transformed POINTS
+// and MATRICES, never decomposed convenience values, because comparing
+// decomposed values is exactly what hid the defect.
+// ---------------------------------------------------------------------------
+
+const rotZ = (radians) => [0, 0, Math.sin(radians / 2), Math.cos(radians / 2)];
+const rotX = (radians) => [Math.sin(radians / 2), 0, 0, Math.cos(radians / 2)];
+
+/** Builds a chain of nodes n0 -> n1 -> ... from a list of local transforms. */
+function chainDefinition(id, transforms) {
+  return createSceneDefinition({
+    id,
+    nodes: transforms.map((transform, i) => createSceneNode({
+      pid: `n${i}`, name: `N${i}`, parent: i === 0 ? null : `n${i - 1}`, transform
+    }))
+  });
+}
+
+const worldOf = (artifact, pid) => artifact.nodes.find((n) => n.pid === pid).world;
+const closeTo = (actual, expected, epsilon = 1e-12) =>
+  actual.every((v, i) => Math.abs(v - expected[i]) < epsilon);
+
+test('REGRESSION: non-uniform parent scale above a rotated child places correctly', () => {
+  // The validator's exact reproduction. The old independent-TRS composition
+  // produced [0, 2, 0] because it applied the parent's scale to the child's
+  // offset BEFORE the parent's rotation, which is not what the authored chain
+  // means. Correct is scale(2,1,1) * rotZ(90) * translate(1,0,0) applied to
+  // the origin: the translation rotates onto +Y first, and the x-only scale
+  // then has nothing to stretch.
+  const artifact = compileScene(chainDefinition('validator-repro', [
+    { scale: [2, 1, 1] },
+    { rotation: rotZ(Math.PI / 2) },
+    { translation: [1, 0, 0] }
+  ]));
+
+  const world = worldOf(artifact, 'n2');
+  assert.ok(closeTo([...world.translation], [0, 1, 0]),
+    `world translation ${JSON.stringify([...world.translation])}, expected [0, 1, 0]`);
+
+  // And prove it through the authoritative matrix, not only the convenience
+  // value read out of it.
+  assert.ok(closeTo(transformPoint(world.matrix, [0, 0, 0]), [0, 1, 0]),
+    `matrix applied to origin ${JSON.stringify(transformPoint(world.matrix, [0, 0, 0]))}`);
+});
+
+test('AFFINE 1: uniform scale, rotation and translation compose', () => {
+  const artifact = compileScene(chainDefinition('uniform', [
+    { translation: [1, 2, 3], rotation: rotZ(Math.PI / 2), scale: [2, 2, 2] },
+    { translation: [1, 0, 0] }
+  ]));
+  // Child local origin is at parent-local (1,0,0), scaled by 2 -> (2,0,0),
+  // rotated a quarter turn about Z -> (0,2,0), then translated -> (1,4,3).
+  assert.ok(closeTo([...worldOf(artifact, 'n1').translation], [1, 4, 3]),
+    JSON.stringify([...worldOf(artifact, 'n1').translation]));
+});
+
+test('AFFINE 2: non-uniform parent scale over a rotated child produces shear', () => {
+  // A 45 degree rotation under a non-uniform scale genuinely shears: the basis
+  // columns stop being perpendicular, and no TRS can express the result. An
+  // axis-aligned rotation would not shear, so the angle matters.
+  const artifact = compileScene(chainDefinition('shear', [
+    { scale: [2, 1, 1] },
+    { rotation: rotZ(Math.PI / 4) }
+  ]));
+  const world = worldOf(artifact, 'n1');
+  assert.equal(world.sheared, true, 'this composition must actually shear');
+  assert.equal(hasShear(world.matrix), true);
+  assert.equal(artifact.shearedNodeCount, 1);
+
+  // A unit square corner must land where the full chain puts it.
+  const expected = transformPoint(
+    multiplyMatrices(
+      matrixFromTRS(createLocalTransform({ scale: [2, 1, 1] })),
+      matrixFromTRS(createLocalTransform({ rotation: rotZ(Math.PI / 4) }))
+    ),
+    [1, 1, 0]
+  );
+  assert.ok(closeTo(transformPoint(world.matrix, [1, 1, 0]), expected), 'sheared point must match');
+});
+
+test('AFFINE 3: rotated parent over a non-uniformly scaled child', () => {
+  const artifact = compileScene(chainDefinition('rot-then-scale', [
+    { rotation: rotZ(Math.PI / 2) },
+    { scale: [3, 1, 1] },
+    { translation: [1, 0, 0] }
+  ]));
+  // The child's x-scale acts in the child's own frame, which the parent has
+  // already turned onto +Y. So one unit of local +X becomes three units of
+  // world +Y.
+  assert.ok(closeTo([...worldOf(artifact, 'n2').translation], [0, 3, 0]),
+    JSON.stringify([...worldOf(artifact, 'n2').translation]));
+  // This ordering does NOT shear: the rotation is outermost.
+  assert.equal(worldOf(artifact, 'n2').sheared, false);
+});
+
+test('AFFINE 4: three-level mixed scale and rotation', () => {
+  const chain = [
+    { translation: [0, 1, 0], rotation: rotZ(Math.PI / 6), scale: [2, 1, 1] },
+    { translation: [1, 0, 0], rotation: rotX(Math.PI / 3), scale: [1, 3, 1] },
+    { translation: [0, 0, 2], rotation: rotZ(-Math.PI / 4), scale: [1, 1, 0.5] }
+  ];
+  const artifact = compileScene(chainDefinition('mixed', chain));
+
+  let expected = identityMatrix();
+  for (const step of chain) {
+    expected = multiplyMatrices(expected, matrixFromTRS(createLocalTransform(step)));
+  }
+  const actual = worldOf(artifact, 'n2').matrix;
+  for (let i = 0; i < 16; i++) {
+    assert.ok(Math.abs(actual[i] - expected[i]) < 1e-12, `element ${i}`);
+  }
+});
+
+test('AFFINE 5: siblings are independent of each other', () => {
+  const artifact = compileScene(createSceneDefinition({
+    id: 'siblings',
+    nodes: [
+      createSceneNode({ pid: 'p', name: 'P', transform: { scale: [2, 1, 1], rotation: rotZ(Math.PI / 4) } }),
+      createSceneNode({ pid: 'a', name: 'A', parent: 'p', transform: { translation: [1, 0, 0] } }),
+      createSceneNode({ pid: 'b', name: 'B', parent: 'p', transform: { translation: [0, 1, 0] } })
+    ]
+  }));
+  const parent = worldOf(artifact, 'p').matrix;
+  for (const [pid, local] of [['a', [1, 0, 0]], ['b', [0, 1, 0]]]) {
+    const expected = transformPoint(parent, local);
+    assert.ok(closeTo([...worldOf(artifact, pid).translation], expected),
+      `${pid} must be placed by the parent alone, not by its sibling`);
+  }
+  assert.notDeepEqual([...worldOf(artifact, 'a').translation], [...worldOf(artifact, 'b').translation]);
+});
+
+test('AFFINE 6: an identity hierarchy leaves everything at the origin', () => {
+  const artifact = compileScene(chainDefinition('identity', [{}, {}, {}]));
+  for (const node of artifact.nodes) {
+    assert.deepEqual([...node.world.matrix], identityMatrix());
+    assert.deepEqual([...node.world.translation], [0, 0, 0]);
+    assert.equal(node.world.sheared, false);
+  }
+});
+
+test('AFFINE 7: a deeply nested chain accumulates exactly', () => {
+  const depth = 40;
+  const step = { translation: [0.25, 0, 0], rotation: rotZ(Math.PI / 20), scale: [1, 1, 1] };
+  const artifact = compileScene(chainDefinition('deep-chain', Array.from({ length: depth }, () => step)));
+  assert.equal(artifact.maxDepth, depth - 1);
+
+  let expected = identityMatrix();
+  for (let i = 0; i < depth; i++) {
+    expected = multiplyMatrices(expected, matrixFromTRS(createLocalTransform(step)));
+  }
+  const actual = worldOf(artifact, `n${depth - 1}`).matrix;
+  for (let i = 0; i < 16; i++) {
+    assert.ok(Math.abs(actual[i] - expected[i]) < 1e-9, `element ${i} drifted`);
+  }
+});
+
+test('AFFINE 8: parentMatrix * childMatrix * point equals the compiled world matrix', () => {
+  // The composition law itself, stated as an equation and checked on points
+  // rather than on a decomposition.
+  const artifact = compileScene(chainDefinition('law', [
+    { translation: [1, -2, 0.5], rotation: rotZ(0.9), scale: [2, 0.5, 1] },
+    { translation: [0, 3, -1], rotation: rotX(-0.4), scale: [1, 2, 3] }
+  ]));
+
+  const parentMatrix = worldOf(artifact, 'n0').matrix;
+  const childLocal = matrixFromTRS(artifact.nodes.find((n) => n.pid === 'n1').local);
+  const childWorld = worldOf(artifact, 'n1').matrix;
+
+  for (const point of [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1], [-2.5, 1.25, 3.75]]) {
+    const viaChain = transformPoint(parentMatrix, transformPoint(childLocal, point));
+    const viaWorld = transformPoint(childWorld, point);
+    assert.ok(closeTo(viaWorld, viaChain, 1e-12),
+      `point ${JSON.stringify(point)}: ${JSON.stringify(viaWorld)} vs ${JSON.stringify(viaChain)}`);
+  }
+});
+
+test('AFFINE 9: transform order is T * R * S, not any other ordering', () => {
+  // Scale first, then rotate, then translate - matching transformMesh. If the
+  // order were T * S * R the translation would come out scaled.
+  const trs = { translation: [10, 0, 0], rotation: rotZ(Math.PI / 2), scale: [2, 1, 1] };
+  const artifact = compileScene(chainDefinition('order', [trs]));
+  const world = worldOf(artifact, 'n0');
+
+  // The node's own origin is unaffected by its scale and rotation.
+  assert.ok(closeTo([...world.translation], [10, 0, 0]));
+  // A local +X unit is scaled by 2 and then rotated onto +Y, then offset.
+  assert.ok(closeTo(transformPoint(world.matrix, [1, 0, 0]), [10, 2, 0]),
+    JSON.stringify(transformPoint(world.matrix, [1, 0, 0])));
+  // Had scale been applied after rotation, the result would be [10, 1, 0].
+  assert.ok(!closeTo(transformPoint(world.matrix, [1, 0, 0]), [10, 1, 0]));
+});
+
+test('the matrix convention is column-major with translation in elements 12-14', () => {
+  // Stated and tested rather than inferred, because a silent row/column
+  // mismatch is invisible until something renders wrong.
+  const artifact = compileScene(chainDefinition('convention', [
+    { translation: [7, 8, 9] }
+  ]));
+  const m = worldOf(artifact, 'n0').matrix;
+  assert.equal(m.length, 16);
+  assert.equal(m[12], 7);
+  assert.equal(m[13], 8);
+  assert.equal(m[14], 9);
+  assert.equal(m[15], 1);
+  assert.deepEqual([...translationOf(m)], [7, 8, 9]);
+  // Bottom row of an affine transform, in column-major positions.
+  assert.deepEqual([m[3], m[7], m[11]], [0, 0, 0]);
+});
+
+// ---------------------------------------------------------------------------
+// ARTIFACT IMMUTABILITY — SCENE-COMPOSITION-001 REPAIR R1
+//
+// The original compiler stored `tags: node.tags` and `local: node.transform`
+// straight from the source. A caller holding a mutable definition could change
+// the artifact's contents after compilation while artifactHash stayed put.
+//
+// These tests deliberately use PLAIN MUTABLE OBJECTS rather than
+// createSceneDefinition(), because that helper freezes its output and would
+// hide the defect entirely.
+// ---------------------------------------------------------------------------
+
+/** A valid definition made of ordinary mutable objects and arrays. */
+function mutableDefinition() {
+  return {
+    version: SCENE_DEFINITION_VERSION,
+    id: 'mutable.scene',
+    units: 'm',
+    upAxis: '+Y',
+    forwardAxis: '-Z',
+    nodes: [
+      {
+        pid: 'root', name: 'Root', parent: null, asset: 'a', tags: ['alpha'],
+        transform: { translation: [1, 2, 3], rotation: [0, 0, 0, 1], scale: [2, 1, 1] }
+      },
+      {
+        pid: 'child', name: 'Child', parent: 'root', asset: null, tags: ['beta'],
+        transform: { translation: [1, 0, 0], rotation: rotZ(Math.PI / 2), scale: [1, 1, 1] }
+      }
+    ]
+  };
+}
+
+test('REGRESSION: a compiled artifact does not alias its source definition', () => {
+  const source = mutableDefinition();
+  const artifact = compileScene(source);
+
+  const before = {
+    artifactHash: artifact.artifactHash,
+    sourceHash: artifact.sourceHash,
+    tags: JSON.stringify(artifact.nodes.map((n) => [...n.tags])),
+    local: JSON.stringify(artifact.nodes.map((n) => ({
+      t: [...n.local.translation], r: [...n.local.rotation], s: [...n.local.scale]
+    }))),
+    matrices: JSON.stringify(artifact.nodes.map((n) => [...n.world.matrix])),
+    translations: JSON.stringify(artifact.nodes.map((n) => [...n.world.translation])),
+    name: artifact.nodes[0].name,
+    asset: artifact.nodes[0].asset
+  };
+
+  // Mutate every mutable container the source owns.
+  source.nodes[0].tags.push('INJECTED');
+  source.nodes[0].transform.translation[0] = 999;
+  source.nodes[0].transform.rotation[3] = 0.5;
+  source.nodes[0].transform.scale[1] = 42;
+  source.nodes[1].tags.length = 0;
+  source.nodes[1].transform.translation[2] = -17;
+  source.nodes[0].name = 'RENAMED';
+  source.nodes[0].asset = 'SWAPPED';
+  source.id = 'HIJACKED';
+  source.nodes.push({ pid: 'sneak', name: 'S', parent: null, tags: [], asset: null,
+    transform: { translation: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] } });
+
+  assert.equal(artifact.artifactHash, before.artifactHash, 'artifactHash must not move');
+  assert.equal(artifact.sourceHash, before.sourceHash, 'sourceHash must not move');
+  assert.equal(artifact.id, 'mutable.scene', 'artifact id must not follow the source');
+  assert.equal(artifact.nodeCount, 2, 'a node appended to the source must not appear');
+  assert.equal(artifact.nodes[0].name, before.name);
+  assert.equal(artifact.nodes[0].asset, before.asset);
+  assert.equal(JSON.stringify(artifact.nodes.map((n) => [...n.tags])), before.tags);
+  assert.equal(JSON.stringify(artifact.nodes.map((n) => ({
+    t: [...n.local.translation], r: [...n.local.rotation], s: [...n.local.scale]
+  }))), before.local);
+  assert.equal(JSON.stringify(artifact.nodes.map((n) => [...n.world.matrix])), before.matrices);
+  assert.equal(JSON.stringify(artifact.nodes.map((n) => [...n.world.translation])), before.translations);
+});
+
+test('every artifact-owned container is frozen, not just the top level', () => {
+  const artifact = compileScene(mutableDefinition());
+
+  assert.ok(Object.isFrozen(artifact));
+  assert.ok(Object.isFrozen(artifact.nodes));
+  assert.ok(Object.isFrozen(artifact.order));
+  assert.ok(Object.isFrozen(artifact.roots));
+
+  for (const node of artifact.nodes) {
+    assert.ok(Object.isFrozen(node), `${node.pid} node`);
+    assert.ok(Object.isFrozen(node.tags), `${node.pid} tags`);
+    assert.ok(Object.isFrozen(node.children), `${node.pid} children`);
+    assert.ok(Object.isFrozen(node.local), `${node.pid} local`);
+    assert.ok(Object.isFrozen(node.local.translation), `${node.pid} local.translation`);
+    assert.ok(Object.isFrozen(node.local.rotation), `${node.pid} local.rotation`);
+    assert.ok(Object.isFrozen(node.local.scale), `${node.pid} local.scale`);
+    assert.ok(Object.isFrozen(node.localMatrix), `${node.pid} localMatrix`);
+    assert.ok(Object.isFrozen(node.world), `${node.pid} world`);
+    assert.ok(Object.isFrozen(node.world.matrix), `${node.pid} world.matrix`);
+    assert.ok(Object.isFrozen(node.world.translation), `${node.pid} world.translation`);
+  }
+});
+
+test('writing through an artifact throws rather than silently succeeding', () => {
+  const artifact = compileScene(mutableDefinition());
+  assert.throws(() => { artifact.id = 'x'; }, TypeError);
+  assert.throws(() => { artifact.nodes[0].pid = 'x'; }, TypeError);
+  assert.throws(() => { artifact.nodes[0].tags.push('x'); }, TypeError);
+  assert.throws(() => { artifact.nodes[0].local.translation[0] = 99; }, TypeError);
+  assert.throws(() => { artifact.nodes[0].world.matrix[12] = 99; }, TypeError);
+  assert.throws(() => { artifact.nodes[0].world.translation[0] = 99; }, TypeError);
+});
+
+test('a decoded definition compiles to an artifact that owns its data', () => {
+  // decodeScene returns frozen objects today, but the artifact must not depend
+  // on that: the compiler is the thing that guarantees ownership.
+  const decoded = decodeScene(encodeScene(createSceneDefinition({
+    id: 'decoded',
+    nodes: [createSceneNode({ pid: 'a', name: 'A', tags: ['t'], transform: { translation: [1, 1, 1] } })]
+  })));
+  const artifact = compileScene(decoded);
+  assert.notEqual(artifact.nodes[0].tags, decoded.nodes[0].tags, 'tags must be a copy, not the same array');
+  assert.notEqual(artifact.nodes[0].local, decoded.nodes[0].transform, 'local must be a copy');
+  assert.notEqual(artifact.nodes[0].local.translation, decoded.nodes[0].transform.translation);
+  assert.deepEqual([...artifact.nodes[0].tags], ['t']);
+});
+
+test('two artifacts compiled from one source share no mutable state', () => {
+  const source = mutableDefinition();
+  const a = compileScene(source);
+  const b = compileScene(source);
+
+  assert.equal(a.artifactHash, b.artifactHash, 'same source, same identity');
+  assert.notEqual(a, b);
+  assert.notEqual(a.nodes[0], b.nodes[0]);
+  assert.notEqual(a.nodes[0].world.matrix, b.nodes[0].world.matrix);
+  assert.deepEqual([...a.nodes[0].world.matrix], [...b.nodes[0].world.matrix]);
 });
