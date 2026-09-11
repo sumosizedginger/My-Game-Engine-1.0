@@ -5,7 +5,7 @@
 | Document class | **EARNED SUBSYSTEM SPECIFICATION** (see `DOCUMENTATION_MAP.md` §2) |
 | Authority | Authoritative within scene composition. Below `CONSTITUTION.md`, `PRD.md` and `ARCHITECTURE.md`. |
 | Earned by | **SCENE-COMPOSITION-001** |
-| Status | **BUILT — AWAITING RE-AUDIT.** Repaired at R1 after independent validation failed the first revision. Not accepted. |
+| Status | **BUILT — AWAITING RE-AUDIT.** Repaired at R1 and R2 after successive independent audits. Not accepted. |
 | Implementing modules | `src/scene/definition.js`, `src/scene/validation.js`, `src/scene/codec.js`, `src/scene/affine.js`, `src/scene/compiler.js`, `src/scene/instance.js`, `src/scene/index.js` |
 | Presentation adapter | `src/render/scene-presentation.js` |
 | Tests | `tests/scene.test.js`, `tests/subterra-cell.test.js`, `tests/scene-browser.test.js` |
@@ -79,11 +79,29 @@ SceneNode {
 }
 
 LocalTRS {
-  translation: [x, y, z]
-  rotation:    [x, y, z, w]   quaternion
-  scale:       [x, y, z]
+  translation: [x, y, z]      finite
+  rotation:    [x, y, z, w]   finite UNIT quaternion
+  scale:       [x, y, z]      finite, non-zero, positive
 }
 ```
+
+**The rotation must be a unit quaternion**, to a tolerance of
+`QUATERNION_UNIT_TOLERANCE` (`1e-6`, exported from `src/geometry/mesh.js`).
+
+A non-unit quaternion scales as a side effect of rotating: `[0, 0, 0.5, 0.5]`
+has length 0.707, so it shrinks a node to 70.7% even though its authored scale
+says `[1, 1, 1]`. That is an implicit scale the author never wrote, and it is
+invisible in the source.
+
+Non-unit quaternions are **refused, never normalized**. Two reasons:
+
+1. **Normalizing rewrites authored source.** The definition is what a human or
+   an AI reads back to understand the scene. Silently changing it makes the
+   source stop describing the artifact.
+2. **The engine already decided this.** `transformMesh` enforces exactly the
+   same contract for geometry, with exactly the same tolerance. Scene
+   composition consumes that constant rather than inventing a second one, so
+   the two cannot drift into disagreeing about what a valid transform is.
 
 The TRS representation is **the one the engine already owns** for geometry (`transformMesh` in `src/geometry/mesh-ops.js`). Reusing it rather than inventing a second convention is deliberate: a node's world placement must agree with what the same TRS would have done to a mesh.
 
@@ -107,14 +125,15 @@ A node references geometry by key. The scene layer never resolves it. This is wh
 | `SCENE_SELF_PARENT` | node parented to itself |
 | `SCENE_CYCLE` | hierarchy ring; a scene is a forest, not a graph |
 | `SCENE_TRANSFORM_INVALID` | non-finite translation, rotation or scale |
-| `SCENE_ROTATION_DEGENERATE` | zero-length quaternion |
+| `SCENE_ROTATION_DEGENERATE` | zero-length quaternion: defines no orientation at all |
+| `SCENE_ROTATION_NOT_UNIT` | finite, non-degenerate, but not unit length: would apply an implicit scale |
 | `SCENE_SCALE_INVALID` | zero or negative scale |
 | `SCENE_TOO_LARGE` | over `SCENE_MAX_NODES` (4096) |
 | `SCENE_ASSET_INVALID`, `SCENE_TAGS_INVALID` | malformed metadata |
 
 **No silent correction.** A structurally ambiguous hierarchy is refused with a diagnostic naming what is wrong. Guessing what an author meant is how editor-only truth gets established.
 
-One defect produces one diagnostic: a self-parent is not also reported as a missing parent and a cycle, and a three-node ring is one `SCENE_CYCLE`, not three.
+One defect produces one diagnostic: a self-parent is not also reported as a missing parent and a cycle, and a three-node ring is one `SCENE_CYCLE`, not three. The same applies to a malformed quaternion — a zero quaternion is degenerate, not *also* non-unit, even though both are technically true.
 
 ---
 
@@ -122,7 +141,7 @@ One defect produces one diagnostic: a self-parent is not also reported as a miss
 
 `compileScene(definition) -> SceneArtifact` (frozen).
 
-The compiler validates, establishes canonical order, derives world transforms and freezes. It does **not** render, own GPU resources, run gameplay or hold state between calls. It is not Kiln: Kiln is the engine-wide compile/bake system (`ARCHITECTURE.md` §6) and remains unbuilt.
+The compiler validates, establishes canonical order, derives world transforms and freezes. **Validation is the authoritative source gate**: `matrixFromTRS` assumes a unit quaternion and neither normalizes nor re-validates, because a second gate competing with the first is how contracts drift. It does **not** render, own GPU resources, run gameplay or hold state between calls. It is not Kiln: Kiln is the engine-wide compile/bake system (`ARCHITECTURE.md` §6) and remains unbuilt.
 
 ### 5.1 Canonical order
 
@@ -318,7 +337,9 @@ No global scene singleton exists. Two independent `SceneInstance`s can coexist, 
 
 ---
 
-## 12.1 Repair record — R1
+## 12.1 Repair record
+
+### R1 — affine hierarchy and artifact immutability
 
 Independent validation failed the first revision (`95ad733`) with two blocking defects. Both are repaired; neither was an input-validation problem, and both definitions involved validated cleanly.
 
@@ -326,7 +347,24 @@ Independent validation failed the first revision (`95ad733`) with two blocking d
 
 **Compiled artifacts aliased their source.** `tags` and the local transform were stored by reference, so a caller mutating a plain-object definition after compilation changed the artifact while `artifactHash` stayed put. Repaired by taking an owned, deep-frozen snapshot before anything is derived (§5), with regressions that deliberately use mutable plain objects because `createSceneDefinition` freezes its output and hid the defect.
 
-Consequences worth knowing:
+### R2 — unit-quaternion source contract
+
+Re-audit of `e205c46` found one further blocking defect: scene validation accepted any finite, non-zero quaternion, while `src/scene/affine.js` uses the quaternion directly in a rotation-matrix formula that assumes unit length.
+
+```text
+rotation [0, 0, 0.5, 0.5], scale [1, 1, 1]
+
+before   VALID; X basis length 0.7071 — an implicit 29% shrink
+after    REJECTED with SCENE_ROTATION_NOT_UNIT; compileScene fails closed
+```
+
+Repaired by sharing the contract geometry already had. `QUATERNION_UNIT_TOLERANCE` moved from a module-private constant in `src/geometry/mesh-ops.js` into the MeshIR core at `src/geometry/mesh.js`, and is now consumed by both `transformMesh` and `validateSceneDefinition`. The value, the comparison and `transformMesh`'s behaviour are unchanged; only the constant's home moved, so the two systems cannot drift onto separately invented tolerances.
+
+`SCENE_ROTATION_NOT_UNIT` is a new code rather than an overload of `SCENE_ROTATION_DEGENERATE`: a length-0.5 quaternion defines a perfectly good orientation and fails for a different reason than one that defines none.
+
+SUBTERRA and the affine probe both validate unchanged under the stronger contract — worst deviation across every authored quaternion is 2.22e-16, nine orders of magnitude inside tolerance. No content moved and no source hash changed.
+
+### Consequences worth knowing:
 
 - `SCENE_ARTIFACT_VERSION` went 1 → 2. `world.rotation` and `world.scale` were removed rather than kept as a mathematically false convenience; the branch was unaccepted, so there was nothing to stay compatible with.
 - SUBTERRA's rendered output is **unchanged**. It authors no scale, so the old and new composition agree there — which is why the cell could not have caught this and the affine probe exists.

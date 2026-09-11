@@ -786,7 +786,7 @@ Kiln remains the architecturally correct home for any future decoupling: `CONSTI
 
 ## 46.2 Scene and composition
 
-**FOUNDATION BUILT by SCENE-COMPOSITION-001. Repaired at R1. Awaiting independent re-audit.**
+**FOUNDATION BUILT by SCENE-COMPOSITION-001. Repaired at R1 and R2. Awaiting independent re-audit.**
 
 This was the largest identified structural gap: there was no general engine-owned scene or composition model, and each proof assembled its own renderer scene. Correct for bounded proofs, insufficient for a general-purpose engine.
 
@@ -1231,7 +1231,7 @@ Statuses use the vocabulary in §3. Each is supported by an accepted base revisi
 | Proof E — Blind API Generality | **ACCEPTED** | `c62975dbf68c2305e38c00b9cdc1ed5707777d4a` | `docs/learn/BUILDING_AN_UNPLANNED_GAME.md` |
 | AI-ASSET-FOUNDATION-001 | **ACCEPTED** | `798bd89c006f20f0b9a9f20b05443b6493436d14` | merged as `07e555af55f5ee61f8fbef7fbd2da90d6d782419` after independent verification |
 | GENERAL-ENGINE-DIRECTION-001 | **BUILT — AWAITING AUDIT** | `dabd22920c39e9ebf458fba1cef5b40f3ac89f93` | documentation and product-direction reconciliation; not yet merged to main |
-| SCENE-COMPOSITION-001 | **BUILT — AWAITING RE-AUDIT** | see branch `scene-composition-001` | scene composition foundation; `docs/spec/scene.md`; forcing consumer SUBTERRA cell. First revision `95ad733` FAILED independent validation on two blocking defects; repaired at R1 (`docs/spec/scene.md` §12.1) |
+| SCENE-COMPOSITION-001 | **BUILT — AWAITING RE-AUDIT** | see branch `scene-composition-001` | scene composition foundation; `docs/spec/scene.md`; forcing consumer SUBTERRA cell. `95ad733` failed independent validation on two blocking defects (R1); `e205c46` failed re-audit on a unit-quaternion contract defect (R2). See `docs/spec/scene.md` §12.1 |
 
 Acceptance evidence for the six proofs is the accepted learning material in `docs/learn/`, which §28 of `DOCUMENTATION_MAP.md` permits only after a proof is accepted, together with the base revision each lesson names.
 
@@ -1246,7 +1246,7 @@ Independent verification at the accepted revision reproduced: Node v24.21.0, 429
 ```text
 SCENE-COMPOSITION-001
   scene composition foundation
-  BUILT - repaired at R1 - awaiting independent RE-AUDIT
+  BUILT - repaired at R1 and R2 - awaiting independent RE-AUDIT
 ```
 
 It implements the keystone recorded in §46.2: engine-owned scene composition with persistent authored identity, hierarchy, derived world transforms, deterministic serialization, an immutable compiled artifact, runtime instantiation, and clean unload and reload. Its forcing consumer is the SUBTERRA cell, a 37-node constructed underground environment built through the public API.

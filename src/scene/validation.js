@@ -11,10 +11,17 @@
  * exactly what is wrong. Guessing what an author meant is how editor-only
  * truth gets established, and CONSTITUTION.md §23 forbids it.
  *
+ * That applies to values as well as structure. A non-unit rotation quaternion
+ * is refused rather than normalized, matching the contract `transformMesh`
+ * already enforces for geometry: normalizing would rewrite authored source
+ * behind the author's back, and the source is what a human or an AI reads to
+ * understand the scene.
+ *
  * This module must never import 'three'.
  */
 
 import { createDiagnostic } from '../runtime/index.js';
+import { QUATERNION_UNIT_TOLERANCE } from '../geometry/mesh.js';
 import { SCENE_DEFINITION_VERSION, SCENE_MAX_NODES } from './definition.js';
 
 /** Identity strings accepted for `pid`: no whitespace, bounded length. */
@@ -108,13 +115,32 @@ export function validateSceneDefinition(definition) {
       fail('SCENE_TRANSFORM_INVALID',
         `Scene node "${node.pid}" translation must be a finite [x, y, z]`, { ...at, translation: t.translation });
     }
+    // One malformed quaternion produces exactly one diagnostic: the chain below
+    // is ordered from most to least fundamental, and stops at the first match.
     if (!isFiniteArray(t.rotation, 4)) {
       fail('SCENE_TRANSFORM_INVALID',
         `Scene node "${node.pid}" rotation must be a finite quaternion [x, y, z, w]`, { ...at, rotation: t.rotation });
-    } else if (Math.hypot(...t.rotation) < 1e-6) {
+    } else if (Math.hypot(...t.rotation) < QUATERNION_UNIT_TOLERANCE) {
       fail('SCENE_ROTATION_DEGENERATE',
         `Scene node "${node.pid}" rotation quaternion has zero length and cannot define an orientation`,
         { ...at, rotation: t.rotation });
+    } else if (Math.abs(Math.hypot(...t.rotation) - 1) > QUATERNION_UNIT_TOLERANCE) {
+      // A non-unit quaternion is NOT degenerate: it defines a perfectly good
+      // orientation. It is rejected because the rotation-matrix formula in
+      // src/scene/affine.js assumes unit length, so a quaternion of length
+      // 0.707 shrinks the node by 0.707 even though its authored scale says
+      // [1, 1, 1]. That is an implicit scale the author never wrote.
+      //
+      // It is REFUSED rather than normalized. Normalizing would silently
+      // rewrite authored source, and the source is the truth a human or an AI
+      // is meant to be able to read back. The same contract is enforced by
+      // `transformMesh` for geometry.
+      const length = Math.hypot(...t.rotation);
+      fail('SCENE_ROTATION_NOT_UNIT',
+        `Scene node "${node.pid}" rotation must be a unit quaternion; |q| = ${length}. ` +
+        'A non-unit quaternion scales the node as a side effect of rotating it. ' +
+        'Normalize it at the authoring site so the intent is explicit.',
+        { ...at, rotation: t.rotation, length, tolerance: QUATERNION_UNIT_TOLERANCE });
     }
     if (!isFiniteArray(t.scale, 3)) {
       fail('SCENE_TRANSFORM_INVALID',

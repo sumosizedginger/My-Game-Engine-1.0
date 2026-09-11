@@ -24,7 +24,8 @@ import {
   OPTIONAL_ATTRIBUTES,
   ATTRIBUTE_ITEM_SIZE,
   ATTRIBUTE_MERGE_DEFAULTS,
-  normalizeZero
+  normalizeZero,
+  QUATERNION_UNIT_TOLERANCE
 } from './mesh.js';
 import { transformAnchor } from './anchors.js';
 
@@ -477,9 +478,6 @@ export function extrudeProfile({
     regionId, surfaceId, materialId, anchors, diagnostics
   });
 }
-
-/** Tolerance for accepting a quaternion as unit length. */
-const QUATERNION_UNIT_TOLERANCE = 1e-6;
 
 /**
  * Validates a TRS transform, failing closed on anything this tranche does not

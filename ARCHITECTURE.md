@@ -1431,7 +1431,7 @@ If a simpler design survives the same proofs and preserves the Constitution, pre
 
 ### FOUNDATION BUILT — AWAITING RE-AUDIT
 
-SCENE-COMPOSITION-001 implemented the foundation. Independent validation failed its first revision on two blocking defects, both repaired at R1 (see `docs/spec/scene.md` §12.1). It has **not** been re-audited or human-accepted, and must not be described as ACCEPTED until it is.
+SCENE-COMPOSITION-001 implemented the foundation. Successive independent audits failed it twice — two blocking defects repaired at R1, and a unit-quaternion source-contract defect repaired at R2 (see `docs/spec/scene.md` §12.1). It has **not** been re-audited or human-accepted, and must not be described as ACCEPTED until it is.
 
 **What now exists.** `SceneDefinition` (source) compiles to a deep-frozen `SceneArtifact` and instantiates into a `SceneInstance`: persistent authored identity, hierarchy, local transforms, derived world composition as affine matrices, deterministic canonical serialization, immutable artifact identity, runtime entity mapping, clean unload and reload, independent instances, structured diagnostics, and a supported public API split across `engine/runtime` and `engine/full`. Its forcing consumer is the SUBTERRA cell, a 37-node constructed environment. The subsystem specification is `docs/spec/scene.md`.
 

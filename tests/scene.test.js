@@ -36,6 +36,8 @@ import {
 } from '../src/scene/index.js';
 import { createEntityManager } from '../src/runtime/entities.js';
 import { createTransformManager, TRANSFORM_OWNERSHIP } from '../src/runtime/transforms.js';
+import { QUATERNION_UNIT_TOLERANCE } from '../src/geometry/mesh.js';
+import { createBoxMesh, transformMesh } from '../src/geometry/mesh-ops.js';
 
 const rotY = (radians) => [0, Math.sin(radians / 2), 0, Math.cos(radians / 2)];
 
@@ -1117,4 +1119,145 @@ test('two artifacts compiled from one source share no mutable state', () => {
   assert.notEqual(a.nodes[0], b.nodes[0]);
   assert.notEqual(a.nodes[0].world.matrix, b.nodes[0].world.matrix);
   assert.deepEqual([...a.nodes[0].world.matrix], [...b.nodes[0].world.matrix]);
+});
+
+// ---------------------------------------------------------------------------
+// UNIT-QUATERNION SOURCE CONTRACT — SCENE-COMPOSITION-001 REPAIR R2
+//
+// Scene validation accepted any finite, non-zero quaternion. But the rotation
+// matrix formula in src/scene/affine.js assumes UNIT length, so a quaternion of
+// length 0.707 shrank a node by 0.707 while its authored scale said [1, 1, 1] —
+// an implicit scale the author never wrote.
+//
+// The contract already existed for geometry: transformMesh rejects non-unit
+// quaternions with the same 1e-6 tolerance. Scene composition now shares that
+// exact constant rather than inventing a second one.
+//
+// Non-unit quaternions are REFUSED, never normalized. Normalizing would rewrite
+// authored source behind the author's back.
+// ---------------------------------------------------------------------------
+
+/** Builds a one-node definition carrying the given rotation. */
+function rotationDefinition(rotation) {
+  return createSceneDefinition({
+    id: 'rotation.contract',
+    nodes: [createSceneNode({ pid: 'n', name: 'N', transform: { rotation } })]
+  });
+}
+
+test('REGRESSION: a non-unit quaternion is refused, not silently normalized', () => {
+  // The validator's exact case. |q| = 0.7071..., so the node would have been
+  // shrunk to 70.7% while its authored scale said [1, 1, 1].
+  const rotation = [0, 0, 0.5, 0.5];
+  assert.ok(Math.abs(Math.hypot(...rotation) - 1) > QUATERNION_UNIT_TOLERANCE,
+    'the fixture must genuinely be non-unit');
+
+  const result = validateSceneDefinition(rotationDefinition(rotation));
+  assert.equal(result.valid, false);
+  assert.ok(codesOf(result).includes('SCENE_ROTATION_NOT_UNIT'),
+    `expected SCENE_ROTATION_NOT_UNIT, got ${codesOf(result).join(',')}`);
+
+  // The diagnostic carries the measurement, so an author can see how far off
+  // they are rather than guessing.
+  const diagnostic = result.diagnostics.find((d) => d.code === 'SCENE_ROTATION_NOT_UNIT');
+  assert.equal(diagnostic.severity, 'ERROR');
+  assert.equal(diagnostic.subsystem, 'scene');
+  assert.ok(Math.abs(diagnostic.data.length - Math.SQRT1_2) < 1e-12);
+  assert.equal(diagnostic.data.tolerance, QUATERNION_UNIT_TOLERANCE);
+  assert.match(diagnostic.message, /unit quaternion/);
+  // The message must tell the author what to do, not merely that it failed.
+  assert.match(diagnostic.message, /Normalize it at the authoring site/);
+});
+
+test('compileScene fails closed on a non-unit quaternion', () => {
+  // Validation is the authoritative gate, and compilation enforces it before
+  // any matrix is built. Previously this compiled successfully and produced a
+  // silently shrunken node.
+  assert.throws(() => compileScene(rotationDefinition([0, 0, 0.5, 0.5])), (error) => {
+    assert.match(error.message, /SCENE_ROTATION_NOT_UNIT/);
+    assert.ok(error.diagnostics.some((d) => d.code === 'SCENE_ROTATION_NOT_UNIT'));
+    return true;
+  });
+});
+
+test('the unit-quaternion tolerance is shared with the geometry TRS contract', () => {
+  // One constant, one meaning. If these ever diverge, a transform valid for a
+  // scene could be invalid for the mesh inside it.
+  assert.equal(QUATERNION_UNIT_TOLERANCE, 1e-6);
+
+  // transformMesh enforces the same rule on the same value.
+  const mesh = createBoxMesh({ width: 1, height: 1, depth: 1, semanticName: 'probe' });
+  assert.throws(() => transformMesh(mesh, { rotation: [0, 0, 0.5, 0.5] }), /unit quaternion/);
+  assert.doesNotThrow(() => transformMesh(mesh, { rotation: [0, 0, 0, 1] }));
+});
+
+test('BOUNDARY: quaternion acceptance is exactly the shared tolerance', () => {
+  const cases = [
+    ['identity', [0, 0, 0, 1], true, null],
+    ['generated 90 deg about Z', [0, 0, Math.sin(Math.PI / 4), Math.cos(Math.PI / 4)], true, null],
+    ['generated 30 deg about X', [Math.sin(Math.PI / 12), 0, 0, Math.cos(Math.PI / 12)], true, null],
+    ['half length', [0, 0, 0.5, 0.5], false, 'SCENE_ROTATION_NOT_UNIT'],
+    ['double length', [0, 0, 0, 2], false, 'SCENE_ROTATION_NOT_UNIT'],
+    ['just outside tolerance, long', [0, 0, 0, 1 + 2e-6], false, 'SCENE_ROTATION_NOT_UNIT'],
+    ['just outside tolerance, short', [0, 0, 0, 1 - 2e-6], false, 'SCENE_ROTATION_NOT_UNIT'],
+    ['just inside tolerance, long', [0, 0, 0, 1 + 5e-7], true, null],
+    ['just inside tolerance, short', [0, 0, 0, 1 - 5e-7], true, null],
+    ['zero quaternion', [0, 0, 0, 0], false, 'SCENE_ROTATION_DEGENERATE'],
+    ['effectively zero', [0, 0, 0, 1e-9], false, 'SCENE_ROTATION_DEGENERATE'],
+    ['NaN component', [0, 0, 0, Number.NaN], false, 'SCENE_TRANSFORM_INVALID'],
+    ['Infinite component', [Infinity, 0, 0, 1], false, 'SCENE_TRANSFORM_INVALID'],
+    ['wrong arity', [0, 0, 1], false, 'SCENE_TRANSFORM_INVALID']
+  ];
+
+  for (const [label, rotation, expectValid, expectedCode] of cases) {
+    const result = validateSceneDefinition(rotationDefinition(rotation));
+    assert.equal(result.valid, expectValid,
+      `${label}: expected ${expectValid ? 'ACCEPT' : 'REJECT'}, got ${codesOf(result).join(',') || 'ACCEPT'}`);
+
+    if (expectedCode) {
+      assert.ok(codesOf(result).includes(expectedCode),
+        `${label}: expected ${expectedCode}, got ${codesOf(result).join(',')}`);
+      // ONE malformed quaternion must produce ONE diagnostic. A zero
+      // quaternion is also non-unit, and reporting both would be noise that
+      // makes the real problem harder to see.
+      const rotationCodes = codesOf(result).filter((c) => c.startsWith('SCENE_ROTATION_') || c === 'SCENE_TRANSFORM_INVALID');
+      assert.equal(rotationCodes.length, 1,
+        `${label}: expected exactly one rotation diagnostic, got ${rotationCodes.join(',')}`);
+    }
+  }
+});
+
+test('a degenerate quaternion is not reported as merely non-unit', () => {
+  // These are different failures. A zero quaternion defines no orientation at
+  // all; a length-0.5 quaternion defines a perfectly good orientation and is
+  // refused for a different reason. Overloading one code would lose that.
+  const zero = codesOf(validateSceneDefinition(rotationDefinition([0, 0, 0, 0])));
+  assert.ok(zero.includes('SCENE_ROTATION_DEGENERATE'));
+  assert.ok(!zero.includes('SCENE_ROTATION_NOT_UNIT'));
+
+  const short = codesOf(validateSceneDefinition(rotationDefinition([0, 0, 0.5, 0.5])));
+  assert.ok(short.includes('SCENE_ROTATION_NOT_UNIT'));
+  assert.ok(!short.includes('SCENE_ROTATION_DEGENERATE'));
+});
+
+test('the authored quaternion is preserved exactly, never rewritten', () => {
+  // Proof that nothing normalizes behind the author's back: an accepted
+  // quaternion survives compilation bit for bit.
+  const rotation = [0, 0, Math.sin(Math.PI / 4), Math.cos(Math.PI / 4)];
+  const artifact = compileScene(rotationDefinition(rotation));
+  assert.deepEqual([...artifact.nodes[0].local.rotation], rotation);
+});
+
+test('an accepted rotation produces a matrix with unit basis columns', () => {
+  // The property the contract exists to guarantee: authored scale [1,1,1]
+  // means an actual scale of 1, with no implicit shrink hidden in the rotation.
+  for (const angle of [0, Math.PI / 6, Math.PI / 4, Math.PI / 2, 2.3]) {
+    const rotation = [0, 0, Math.sin(angle / 2), Math.cos(angle / 2)];
+    const artifact = compileScene(rotationDefinition(rotation));
+    const m = artifact.nodes[0].world.matrix;
+    for (const col of [[m[0], m[1], m[2]], [m[4], m[5], m[6]], [m[8], m[9], m[10]]]) {
+      assert.ok(Math.abs(Math.hypot(...col) - 1) < 1e-12,
+        `angle ${angle}: basis column length ${Math.hypot(...col)} must be 1`);
+    }
+  }
 });

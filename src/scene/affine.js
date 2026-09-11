@@ -68,9 +68,21 @@ export function identityMatrix() {
  * Computes `T * R * S`. The rotation quaternion is XYZW, matching the
  * convention `transformMesh` and MeshIR already use.
  *
+ * PRECONDITION: `rotation` MUST be a unit quaternion. The rotation-matrix
+ * formula below assumes it, and a non-unit quaternion silently scales: length
+ * 0.707 shrinks the node by 0.707 regardless of its authored scale.
+ *
+ * This function does NOT normalize and does NOT validate. Normalizing here
+ * would hide invalid source from the author; validating here would create a
+ * second gate competing with the authoritative one. `validateSceneDefinition`
+ * is the source gate, it rejects non-unit quaternions with
+ * `SCENE_ROTATION_NOT_UNIT`, and `compileScene` enforces it before any matrix
+ * is built. The shared tolerance is `QUATERNION_UNIT_TOLERANCE` in
+ * src/geometry/mesh.js.
+ *
  * @param {object} trs
  * @param {Array<number>} trs.translation - [x, y, z].
- * @param {Array<number>} trs.rotation - Quaternion [x, y, z, w].
+ * @param {Array<number>} trs.rotation - UNIT quaternion [x, y, z, w].
  * @param {Array<number>} trs.scale - [x, y, z].
  * @returns {Array<number>} Column-major 16-element matrix.
  */

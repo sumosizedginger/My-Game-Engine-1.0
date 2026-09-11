@@ -71,6 +71,22 @@ export function normalizeZero(n) {
 }
 
 /**
+ * Tolerance for accepting a quaternion as unit length.
+ *
+ * THE AUTHORED TRS CONTRACT, shared by geometry and scene composition.
+ *
+ * A rotation quaternion must satisfy `|Math.hypot(...q) - 1| <= this`. A
+ * non-unit quaternion scales as a side effect of rotating, so `[0, 0, 0.5,
+ * 0.5]` combined with an authored scale of `[1, 1, 1]` silently shrinks by
+ * 0.707. Both `transformMesh` and `validateSceneDefinition` reject that rather
+ * than normalizing it, because normalizing would rewrite authored intent.
+ *
+ * It lives here, in the MeshIR core, so the two systems cannot drift onto
+ * separately invented values.
+ */
+export const QUATERNION_UNIT_TOLERANCE = 1e-6;
+
+/**
  * Reports whether every entry of an array-like is a finite number.
  *
  * @param {ArrayLike<number>} values

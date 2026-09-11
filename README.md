@@ -40,7 +40,7 @@ Accepted implementation now includes:
 - Proof E: Blind API Generality Test (Order Five, a bounded 3D collection/puzzle game).
 
 - AI-ASSET-FOUNDATION-001: engine-owned AI-native asset authoring.
-- SCENE-COMPOSITION-001: scene and composition foundation — **built, repaired at R1, awaiting re-audit**.
+- SCENE-COMPOSITION-001: scene and composition foundation — **built, repaired at R1 and R2, awaiting re-audit**.
 
 Proof E is accepted: a fresh blind participant successfully built Order Five through the documented public engine surface without core engine modification or private API bypass. This provides strong evidence of runtime and compiler public coherence, though it represents generality evidence rather than universal genre support.
 

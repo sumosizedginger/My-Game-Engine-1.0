@@ -163,6 +163,7 @@ import { MANIFEST_VERSION as MANIFEST_V } from '../preview/manifest.js';
 import { SCENE_DEFINITION_VERSION as SCENE_V } from '../scene/definition.js';
 import { SCENE_CODEC_VERSION as SCENE_CODEC_V } from '../scene/codec.js';
 import { SCENE_ARTIFACT_VERSION as SCENE_ARTIFACT_V } from '../scene/compiler.js';
+import { QUATERNION_UNIT_TOLERANCE as QUAT_TOL } from '../geometry/mesh.js';
 
 /**
  * Machine-readable description of the public authoring capabilities.
@@ -224,9 +225,12 @@ export const AUTHORING_SURFACE = Object.freeze({
     transformOwnership: Object.freeze({ root: 'STATIC', child: 'ATTACHED' }),
     // Local authoring is TRS; compiled world placement is an affine matrix,
     // because a composed hierarchy is not always TRS-representable.
-    localTransform: 'TRS: translation, rotation quaternion XYZW, scale',
+    localTransform: 'TRS: translation, rotation UNIT quaternion XYZW, scale',
     worldTransform: 'affine 4x4, column-major, column vectors',
-    worldComposition: 'worldMatrix = parentWorldMatrix * localMatrix; localMatrix = T * R * S'
+    worldComposition: 'worldMatrix = parentWorldMatrix * localMatrix; localMatrix = T * R * S',
+    // Shared with the geometry TRS contract. A non-unit quaternion scales as a
+    // side effect of rotating, and is refused rather than normalized.
+    quaternionUnitTolerance: QUAT_TOL
   }),
   laws: Object.freeze([
     'Every asset part requires a semanticName. Anonymous parts are refused.',
@@ -238,6 +242,7 @@ export const AUTHORING_SURFACE = Object.freeze({
     'Compiled world placement is an affine matrix. It is not decomposed into rotation and scale, because a sheared hierarchy has no such decomposition.',
     'A compiled artifact owns and deep-freezes its data; mutating the source definition afterwards cannot change it.',
     'Scene persistent ids belong to the source. Runtime entity handles are never serialized.',
-    'Scene hierarchy is a forest: duplicate ids, missing parents, self-parents and cycles are refused.'
+    'Scene hierarchy is a forest: duplicate ids, missing parents, self-parents and cycles are refused.',
+    'A rotation must be a unit quaternion. Non-unit quaternions are refused, never normalized, because they apply an implicit scale and normalizing would rewrite authored source.'
   ])
 });
