@@ -357,6 +357,26 @@ If any of the earned-tier mitigations is dropped, the tier will rot, and the eng
 
 ---
 
+# POST-AUDIT UPDATE — 2026-09-11
+
+*Appended, not rewritten. The findings above record what was true at audit time and are left intact; erasing a gap once it is addressed destroys the reasoning that justified addressing it.*
+
+**SCENE-COMPOSITION-001** built the scene and composition foundation that section C.1 named the largest structural blocker and section D called the keystone. It is **BUILT — AWAITING RE-AUDIT**: its first revision failed independent validation on two blocking transform and immutability defects, both repaired at R1 (see `docs/spec/scene.md` §12.1). Not accepted, not merged.
+
+What changed against this audit's findings:
+
+| Audit finding | Status now |
+| --- | --- |
+| B.1 / C.1.1 — no engine-owned scene or composition model | **Foundation built.** `src/scene/**`, `docs/spec/scene.md`, forcing consumer SUBTERRA cell. Prefabs, streaming, save, networking and scene transitions remain unbuilt. |
+| C.1.2 — no Kiln | **Unchanged.** The scene compiler is a scene compiler, not Kiln. |
+| C.1.3 — `instantiate()` is a stub | **Unchanged** for the generic artifact seam. Scenes have their own real instantiation path. |
+| C.1.4 / B.14 / E.3 — public surface excludes implemented capability | **Unchanged for the Forges.** Scene composition was given an intentional public surface from the start rather than inheriting the defect. |
+| F.2 — measurement before render optimization | **Unchanged and respected.** No batching or profiling work was done. |
+
+One finding this audit did not anticipate, surfaced by the implementation: an `EntityHandle` is scoped to the entity manager that issued it, and two managers each starting from an empty pool produce colliding handle values that no lookup can distinguish. See `docs/spec/scene.md` §2.1. It is a documented limit rather than a defect in the scene layer, and closing it would mean changing runtime identity architecture.
+
+---
+
 # CLOSING
 
 The engine's real position is neither 38/100 nor the picture a sympathetic reading would produce.
@@ -366,3 +386,5 @@ It has an unusually strong deterministic foundation, an evaluation and evidence 
 It also has no scene model, no Kiln, a stubbed `instantiate()`, and a public surface that does not expose its own accepted capability.
 
 Both halves are true. This audit exists so that neither gets forgotten.
+
+*As written, 2026-09-10. The scene-model finding was addressed by SCENE-COMPOSITION-001 the following day — see the post-audit update above. The sentence is left standing because a finding that is erased once it is fixed takes its own justification with it.*

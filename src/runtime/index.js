@@ -20,6 +20,12 @@ export * from './collision.js';
 export * from './state.js';
 export * from './rules.js';
 
+// Scene composition (SCENE-COMPOSITION-001): an exported game instantiates and
+// queries compiled scenes. Authoring, validation, serialization and
+// compilation are NOT here — they live in engine/full, so a shipped game does
+// not carry the scene compiler. See CONSTITUTION.md §5.
+export { instantiateScene, liveSceneInstanceCount } from '../scene/instance.js';
+
 /**
  * Creates a structured diagnostic record adhering to CONSTITUTION.md & ARCHITECTURE.md.
  * Shape: { severity, code, step, subsystem, message, data }

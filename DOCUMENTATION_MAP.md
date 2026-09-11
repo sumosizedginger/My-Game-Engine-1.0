@@ -287,7 +287,17 @@ The third slot is left unallocated on purpose. Unspent capacity is architectural
 docs/spec/<domain>.md
 ```
 
-Domains that may plausibly earn one eventually include scene and composition, Kiln compilation, physics, animation graphs, story graphs, timelines, persistence, import, streaming, networking, UI and audio.
+### Existing
+
+```text
+docs/spec/scene.md    Scene and composition.
+                      Earned by SCENE-COMPOSITION-001.
+                      Implementation: src/scene/**, src/render/scene-presentation.js
+```
+
+### Domains that may plausibly earn one eventually
+
+Kiln compilation, physics, animation graphs, story graphs, timelines, persistence, import, streaming, networking, UI and audio.
 
 **That list is not a plan, an authorization, or a set of reserved slots.** It exists so a future agent recognizes that these are expected to be subsystem-scoped rather than core when their time comes.
 
@@ -963,6 +973,30 @@ Do not create an industrial graph system because the roadmap mentions future eff
 
 ---
 
+# 23.5 Scene and Composition Work
+
+Read:
+
+```text
+docs/spec/scene.md
+ARCHITECTURE.md
+GAMEPLAY_FOUNDATION.md
+TESTING_AND_VALIDATION.md
+```
+
+Covers scene composition, hierarchy, scene serialization, scene artifacts and scene lifecycle.
+
+Relevant laws:
+
+- a scene is engine data, never a renderer scene graph;
+- persistent authored `pid` is source identity; `EntityHandle` is runtime identity and is never serialized;
+- a parented node uses `TRANSFORM_OWNERSHIP.ATTACHED`; composition adds no second per-tick transform writer;
+- no global scene singleton: two `SceneInstance`s must be able to coexist.
+
+Do not load this document for rendering, geometry authoring or runtime simulation work.
+
+---
+
 # 24. Performance Work
 
 When real performance work begins, create/read:
@@ -1265,7 +1299,9 @@ Do not fabricate the missing file in the middle of an unrelated task.
 
 If the current work genuinely reaches that subsystem, the orchestrator should explicitly authorize creation of the spec.
 
-This applies equally to `docs/spec/`. The earned tier is not a place to file speculative design. A specification that cannot name the implementation it describes and the tests that hold that implementation to it has not been earned, and should be deleted rather than kept. Git cannot track an empty directory, and `docs/spec/` should not be created until its first earned document exists.
+This applies equally to `docs/spec/`. The earned tier is not a place to file speculative design. A specification that cannot name the implementation it describes and the tests that hold that implementation to it has not been earned, and should be deleted rather than kept.
+
+`docs/spec/` now exists, holding one document: `docs/spec/scene.md`, earned by SCENE-COMPOSITION-001. Its existence is not permission to add neighbours. Each further document is earned the same way, by implementation that already exists.
 
 A document describing a system that does not exist is worse than no document: it reads as capability to every future agent that finds it.
 

@@ -786,13 +786,13 @@ Kiln remains the architecturally correct home for any future decoupling: `CONSTI
 
 ## 46.2 Scene and composition
 
-**Not authorized. Recorded because it is the largest identified structural gap.**
+**FOUNDATION BUILT by SCENE-COMPOSITION-001. Repaired at R1 and R2. Awaiting independent re-audit.**
 
-There is no general engine-owned scene or composition model. Each proof assembles its own renderer scene, which was correct for bounded proofs and is insufficient for a general-purpose engine.
+This was the largest identified structural gap: there was no general engine-owned scene or composition model, and each proof assembled its own renderer scene. Correct for bounded proofs, insufficient for a general-purpose engine.
 
-`ARCHITECTURE.md` §43 records the boundaries. Seven accepted future requirements sit on top of it: prefabs and instancing, save and persistence, story and quest references to world objects, Studio inspection, streaming, networking, and MMO persistence.
+The foundation now exists — `docs/spec/scene.md`, `ARCHITECTURE.md` §43, implementation under `src/scene/` — with the SUBTERRA cell as its forcing consumer. It is a foundation, not a finished subsystem.
 
-It therefore sits early in any general-engine sequence. It must not be designed before a forcing consumer exists: a constructed playable environment is the natural first consumer, and a renderer demonstration is not.
+Seven accepted future requirements sit on top of it and remain unbuilt: prefabs and instancing, save and persistence, story and quest references to world objects, Studio inspection, streaming, networking, and MMO persistence. Each still needs its own forcing consumer and its own bounded tranche; none is authorized by the existence of the foundation.
 
 ---
 
@@ -890,7 +890,13 @@ docs/spec/<domain>.md
 
 Outside the core count, created only after real accepted implementation makes one useful. See `DOCUMENTATION_MAP.md` §4.3.
 
-Do not pre-create any of them as empty shells. Do not create `docs/spec/` itself until its first earned document exists.
+Existing:
+
+```text
+docs/spec/scene.md    Scene and composition. Earned by SCENE-COMPOSITION-001.
+```
+
+Do not pre-create any others as empty shells. The directory existing is not permission to fill it.
 
 ## 49. Learning Documents
 
@@ -1224,6 +1230,8 @@ Statuses use the vocabulary in §3. Each is supported by an accepted base revisi
 | Proof D — Different Genre | **ACCEPTED** | `5fb46b9a3da1a6896530afec86cd205d616e832f` | `docs/learn/BUILDING_A_DIFFERENT_GENRE.md`; `d*` evaluator checks |
 | Proof E — Blind API Generality | **ACCEPTED** | `c62975dbf68c2305e38c00b9cdc1ed5707777d4a` | `docs/learn/BUILDING_AN_UNPLANNED_GAME.md` |
 | AI-ASSET-FOUNDATION-001 | **ACCEPTED** | `798bd89c006f20f0b9a9f20b05443b6493436d14` | merged as `07e555af55f5ee61f8fbef7fbd2da90d6d782419` after independent verification |
+| GENERAL-ENGINE-DIRECTION-001 | **BUILT — AWAITING AUDIT** | `dabd22920c39e9ebf458fba1cef5b40f3ac89f93` | documentation and product-direction reconciliation; not yet merged to main |
+| SCENE-COMPOSITION-001 | **BUILT — AWAITING RE-AUDIT** | see branch `scene-composition-001` | scene composition foundation; `docs/spec/scene.md`; forcing consumer SUBTERRA cell. `95ad733` failed independent validation on two blocking defects (R1); `e205c46` failed re-audit on a unit-quaternion contract defect (R2). See `docs/spec/scene.md` §12.1 |
 
 Acceptance evidence for the six proofs is the accepted learning material in `docs/learn/`, which §28 of `DOCUMENTATION_MAP.md` permits only after a proof is accepted, together with the base revision each lesson names.
 
@@ -1236,25 +1244,29 @@ Independent verification at the accepted revision reproduced: Node v24.21.0, 429
 ### 61.3 Current target
 
 ```text
-GENERAL-ENGINE-DIRECTION-001
-  documentation and product-direction reconciliation
-  no implementation
+SCENE-COMPOSITION-001
+  scene composition foundation
+  BUILT - repaired at R1 and R2 - awaiting independent RE-AUDIT
 ```
 
-That is this tranche. It updates permanent product and architecture documentation so that future implementation can be designed toward the general-engine target without abandoning proof-driven discipline.
+It implements the keystone recorded in §46.2: engine-owned scene composition with persistent authored identity, hierarchy, derived world transforms, deterministic serialization, an immutable compiled artifact, runtime instantiation, and clean unload and reload. Its forcing consumer is the SUBTERRA cell, a 37-node constructed underground environment built through the public API.
+
+It deliberately does NOT implement prefabs, streaming, save games, networking, scene transitions or render batching. See `docs/spec/scene.md` §11.
 
 ### 61.4 What is NOT authorized
 
-No implementation tranche is currently authorized. In particular, none of the following may begin without its own bounded work order and human authorization:
+No further implementation tranche is authorized. In particular, none of the following may begin without its own bounded work order and human authorization:
 
 ```text
 PERFORMANCE-BASELINE-001        see 46.1
 KILN-RENDER-001                 see 46.1 - requires the baseline first
-SCENE / COMPOSITION FOUNDATION  see 46.2
 public surface reconciliation   see 46.3
+prefabs, streaming, save/load, networking, scene transitions
 ```
 
-The baton still moves only after evidence and independent validation justify it.
+The baton still moves only after evidence and independent validation justify it. Neither GENERAL-ENGINE-DIRECTION-001 nor SCENE-COMPOSITION-001 has been accepted.
+
+**Acceptance of SCENE-COMPOSITION-001 is additionally blocked on its parent.** The branch descends from `dabd229` (GENERAL-ENGINE-DIRECTION-001), which is itself unvalidated and unmerged; `main` remains at `07e555a`. A scene tranche cannot make its own parent authority accepted.
 
 ---
 

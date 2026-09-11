@@ -17,6 +17,7 @@ import { getRevisionInfo } from './revision.js';
 import { runBrowserEvaluation } from './browser.js';
 import { cTargetChecks } from './c-checks.js';
 import { dTargetChecks } from './d-checks.js';
+import { sceneTargetChecks } from './scene-checks.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -325,6 +326,20 @@ export async function runEvaluation(options = {}) {
       if (dResult.pageErrors.length) checks.noPageErrors = false;
       if (dResult.failedRequests.length) checks.noFailedRequests = false;
       rawDiagnostics.push(...(dResult.dProof?.diagnosticsRecords || []));
+    }
+
+    let sceneResult = null;
+    if (!isCustomSingleTarget || phase0Url.includes('scene=')) {
+      sceneResult = isCustomSingleTarget ? browserResult : await runBrowserEvaluation({ url: 'http://localhost:5173/?scene=subterra&controlled=1', viewport });
+      Object.assign(checks, sceneTargetChecks(sceneResult));
+      if (!isCustomSingleTarget) {
+        if (sceneResult.screenshotBuffer) captures.push(saveCapture(outputDir, 'scene_subterra_cell_fixture', revision.commit, viewport, sceneResult.screenshotBuffer));
+        allConsoleErrors.push(...sceneResult.consoleErrors); allPageErrors.push(...sceneResult.pageErrors); allFailedRequests.push(...sceneResult.failedRequests);
+      }
+      if (sceneResult.consoleErrors.length) checks.noConsoleErrors = false;
+      if (sceneResult.pageErrors.length) checks.noPageErrors = false;
+      if (sceneResult.failedRequests.length) checks.noFailedRequests = false;
+      rawDiagnostics.push(...(sceneResult.sceneProof?.diagnosticsRecords || []));
     }
 
     const diagnostics = processDiagnostics(rawDiagnostics);

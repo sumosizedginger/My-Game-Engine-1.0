@@ -449,6 +449,15 @@ export function runBrowserEvaluation({
         if (captureScreenshot) screenshotBuffer = await page.screenshot({ type: 'png' });
       }
 
+      let sceneProof = null;
+      if (url.includes('scene=')) {
+        sceneProof = await page.evaluate(async () => {
+          try { return await window.__SCENE_LAB__.runProof(); }
+          catch (error) { return { success: false, error: error.message, stack: error.stack }; }
+        });
+        if (captureScreenshot) screenshotBuffer = await page.screenshot({ type: 'png' });
+      }
+
       return {
         url,
         httpStatus,
@@ -458,6 +467,7 @@ export function runBrowserEvaluation({
         b2Proof,
         cProof,
         dProof,
+        sceneProof,
         domDetails,
         consoleErrors,
         consoleWarnings,
