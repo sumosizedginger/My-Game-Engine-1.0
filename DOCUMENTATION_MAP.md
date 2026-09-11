@@ -35,6 +35,11 @@ If documents conflict, use this order:
 4. ARCHITECTURE.md
 
 5. Relevant permanent subsystem specification
+   - grandfathered root specifications
+     (GAMEPLAY_FOUNDATION, GEOMETRY_FORGE, CHARACTER_FORGE,
+      MOTION_FORGE, MATERIAL_FORGE, WORLD_FORGE)
+   - earned specifications under docs/spec/
+   Both are equal in authority within their own subsystem.
 
 6. DEPENDENCY_POLICY.md
 
@@ -76,6 +81,37 @@ Examples:
 - future subsystem specifications
 
 These may govern implementation.
+
+## EARNED SUBSYSTEM SPECIFICATION
+
+Defines the permanent architecture and contracts of one subsystem, after real implementation has earned it.
+
+Location:
+
+`docs/spec/`
+
+Pattern:
+
+```text
+docs/spec/<domain>.md
+```
+
+Use `docs/spec/<domain>/` only when a domain genuinely holds more than one earned document. Do not create a directory in anticipation of one.
+
+An earned subsystem specification is:
+
+- permanent;
+- authoritative within its own subsystem;
+- below `CONSTITUTION.md`, `PRD.md` and `ARCHITECTURE.md`;
+- equal in subsystem authority to the grandfathered root Forge specifications;
+- above implementation-local convention;
+- routed explicitly through this map;
+- loaded only when its subsystem is relevant to the active task;
+- created **only after implementation earns it**.
+
+These documents are outside the core canonical count (see §3 and §4). That is the whole point: the engine can grow subsystems without growing the set of documents every task must read.
+
+The six existing root-level Forge specifications are **grandfathered at their current paths**. They are not moved. Moving them would create widespread cross-reference churn across this map, the learning documents and source file headers for no routing benefit. New earned specifications use `docs/spec/`.
 
 ## OPERATIONAL POLICY
 
@@ -141,6 +177,16 @@ Location:
 
 Archived files do not govern implementation.
 
+## TEMPORARY WORK ORDER
+
+An authorized bounded instruction for one tranche of work: scope, constraints, and what to return.
+
+A temporary work order is **subordinate to every permanent document above**. It directs work; it does not define architecture. It may not amend the Constitution, the PRD, the architecture or an earned specification, and it may not outrank them merely by being recent or by describing itself as current truth.
+
+When its tranche is accepted, its durable content must be encoded into code, tests, schemas or permanent documents, and the work order is archived. `CONSTITUTION.md` §29 requires this. A completed work order left at repository root is scaffolding that has outlived its build.
+
+Location: `ops/` for new work orders, `docs/archive/` once complete.
+
 ## MODEL ADAPTER
 
 Tiny tool-specific entry files.
@@ -186,41 +232,80 @@ Total physical Markdown files at bootstrap:
 
 `14`
 
-Canonical project-document count:
+Core canonical project-document count:
 
 `12`
 
-The model adapters do not count toward the canonical maximum.
+The model adapters do not count toward the core canonical maximum. Neither do ADRs, learning documents, earned specifications under `docs/spec/`, or community and legal files.
 
 ---
 
-# 4. Future Canonical Subsystem Documents
+# 4. Core Canonical Set and Earned Specifications
 
-These are **approved document slots**, not proof that the corresponding implementation exists.
-
-Create them only when implementation reaches the relevant proof.
-
-Potential durable subsystem specifications:
+`CONSTITUTION.md` §29 sets the ceiling:
 
 ```text
-GAMEPLAY_FOUNDATION.md (Earned by Proof A)
-GEOMETRY_FORGE.md (Earned by Proof B2)
-CHARACTER_FORGE.md (Earned by Proof B1)
-MOTION_FORGE.md (Earned by Proof B1)
-MATERIAL_FORGE.md (Earned by Proof B2)
-WORLD_FORGE.md
-AUDIO_AND_FX.md
-PERFORMANCE_AND_PROFILING.md
-VISUAL_TARGETS_AND_BENCHMARKS.md
+MAXIMUM INTENDED CORE CANONICAL DURABLE SET = 21
 ```
 
-Maximum intended canonical project-document count:
+That number counts **core** documents only. It is a limit on what every task might have to read, not a limit on how much the engine may document.
 
-`21`
+## 4.1 Core canonical set — currently 18 of 21
 
-Do not create these files early merely to fill the architecture.
+The 12 bootstrap documents in §3, plus six earned subsystem specifications grandfathered at repository root:
 
-A subsystem earns a permanent specification when real implementation makes one useful.
+```text
+GAMEPLAY_FOUNDATION.md   (Earned by Proof A)
+GEOMETRY_FORGE.md        (Earned by Proof B2)
+CHARACTER_FORGE.md       (Earned by Proof B1)
+MOTION_FORGE.md          (Earned by Proof B1)
+MATERIAL_FORGE.md        (Earned by Proof B2)
+WORLD_FORGE.md           (Earned by Proof C)
+```
+
+These six do not move. See the EARNED SUBSYSTEM SPECIFICATION class in §2.
+
+## 4.2 Reserved core slots — 3 remaining
+
+```text
+PERFORMANCE_AND_PROFILING.md    reserved, not created
+VISUAL_TARGETS_AND_BENCHMARKS.md reserved, not created
+(one slot intentionally unallocated)
+```
+
+Both reserved documents are retained at **core** level deliberately, because each is cross-cutting policy rather than subsystem behavior. Performance budgets and visual acceptance criteria are read by every tranche that touches performance or appearance, whatever subsystem it belongs to. Filing them under one subsystem would hide them from the tranches that most need them.
+
+Neither has been created. Neither may be created before implementation evidence earns it: `CONSTITUTION.md` §24 and this map's §34 both forbid inventing a document ahead of its need.
+
+The third slot is left unallocated on purpose. Unspent capacity is architectural flexibility, not waste.
+
+`AUDIO_AND_FX.md` was previously a reserved root slot. It is **no longer reserved at root**. Audio is subsystem-scoped rather than cross-cutting, so when audio implementation earns a permanent specification it belongs at `docs/spec/audio.md`. Nothing is created now; no audio implementation exists.
+
+## 4.3 Earned specifications — outside the core count
+
+```text
+docs/spec/<domain>.md
+```
+
+Domains that may plausibly earn one eventually include scene and composition, Kiln compilation, physics, animation graphs, story graphs, timelines, persistence, import, streaming, networking, UI and audio.
+
+**That list is not a plan, an authorization, or a set of reserved slots.** It exists so a future agent recognizes that these are expected to be subsystem-scoped rather than core when their time comes.
+
+Do not create any of them now. Do not create placeholder files. A subsystem earns a permanent specification when real accepted implementation makes one useful, and not before.
+
+## 4.4 What belongs where
+
+| Kind of truth | Home |
+| --- | --- |
+| Project law | `CONSTITUTION.md` |
+| Product requirement | `PRD.md` |
+| Cross-system boundary | `ARCHITECTURE.md` |
+| Cross-cutting policy read by every tranche | core document |
+| One subsystem's permanent contracts | earned specification |
+| How one module currently works | the module and its tests |
+| Active bounded work | temporary work order |
+
+If a detail concerns exactly one subsystem, it does not belong in `ARCHITECTURE.md`. If it is needed to perform unrelated work, it does not belong in an earned specification.
 
 ---
 
@@ -241,6 +326,20 @@ Then load only the task-specific documents below.
 For a tiny mechanical edit with no architecture impact, the active work order plus `AGENTS.md` and the directly relevant spec may be enough.
 
 When uncertain, read the higher-authority document rather than guessing.
+
+## 5.1 Progressive disclosure for permanent subsystem specifications
+
+Load the minimum complete permanent specification set required for the active task.
+
+If more than two subsystem specifications are required, explicitly justify why the work cannot safely be separated into smaller tranches. Needing three subsystems at once is a signal worth examining, not a violation: some work legitimately crosses several domains, and forcing an artificial split would be worse than reading three documents.
+
+This is a heuristic that makes you think, not a rule that decides for you. Do not let a document count determine architecture.
+
+## 5.2 Specification size
+
+Prefer bounded, coherent specifications. Split one when distinct, independently useful subdomains genuinely emerge.
+
+Do not split a coherent specification because it crossed a line count. A single 650-line specification that reads straight through is better evidence than two 330-line documents that force an agent to jump between them.
 
 ---
 
@@ -850,11 +949,13 @@ Anything requiring correctness beneath overhangs, inside caves, or across stacke
 When the subsystem becomes substantial, read:
 
 ```text
-AUDIO_AND_FX.md
+docs/spec/audio.md
 ARCHITECTURE.md
 DEPENDENCY_POLICY.md
 TESTING_AND_VALIDATION.md
 ```
+
+`docs/spec/audio.md` does not exist. No audio implementation exists. Audio is subsystem-scoped rather than cross-cutting, so it earns a specification in the earned tier rather than a core root slot (§4.2). It was previously reserved as a root `AUDIO_AND_FX.md`; that reservation was retired by GENERAL-ENGINE-DIRECTION-001.
 
 Before the dedicated file exists, architecture plus implementation/tests govern the small system.
 
@@ -1163,6 +1264,10 @@ that means the subsystem has not yet earned that permanent specification.
 Do not fabricate the missing file in the middle of an unrelated task.
 
 If the current work genuinely reaches that subsystem, the orchestrator should explicitly authorize creation of the spec.
+
+This applies equally to `docs/spec/`. The earned tier is not a place to file speculative design. A specification that cannot name the implementation it describes and the tests that hold that implementation to it has not been earned, and should be deleted rather than kept. Git cannot track an empty directory, and `docs/spec/` should not be created until its first earned document exists.
+
+A document describing a system that does not exist is worse than no document: it reads as capability to every future agent that finds it.
 
 ---
 

@@ -567,7 +567,58 @@ Do not skip steps because the package appears convenient.
 
 ---
 
-## 23. Final Law
+## 23. External Format Parsers and Import Dependencies
+
+### LONG-TERM POLICY DIRECTION — NO DEPENDENCY IS AUTHORIZED BY THIS SECTION
+
+`PRD.md` §36 makes external asset interoperability a long-term product requirement, and `ARCHITECTURE.md` §44 records the normalization boundary. Import work will eventually put pressure on this policy, because format parsing is one of the few areas where writing it natively is genuinely worse than admitting a dependency.
+
+This section states the rules that pressure must satisfy. It does not pre-approve anything, and §21 applies in full: an approved research direction is not an approved installation.
+
+### 23.1 A parser lives behind its adapter
+
+```text
+EXTERNAL FORMAT
+      |
+      v
+IMPORT ADAPTER          <- the dependency may live here
+      |
+      v
+ENGINE-OWNED NORMALIZED REPRESENTATION   <- and never here
+```
+
+A format parser is admitted **only** inside the import adapter for that format. No vendor type, handle, node object, scene graph or document model may appear in engine-owned representation, in a public API signature, or in any module downstream of the adapter.
+
+The test is the same one §15 applies to donor code: removing the dependency must remove the ability to *ingest* that format, and must break nothing already ingested.
+
+### 23.2 A parser is not engine authority
+
+A parser reads bytes and produces data. It does not define what a mesh is, what a material is, what a semantic part is, or what an animation means. Those are engine-owned questions already answered by MeshIR, Material Forge definitions and the semantic model.
+
+An importer that adopts a foreign format's object model as its own internal representation has inverted this policy, however convenient the shortcut looks at the time.
+
+### 23.3 Admission is still evidence-driven
+
+Every existing requirement in this document applies unchanged: purpose, licence, maintenance and risk, architectural boundary, bundle and runtime impact, deterministic implications, fallback implications, and whether a native implementation would be simpler.
+
+Two additional questions apply to format parsers specifically:
+
+- **Does it run in the browser without a build-time-only assumption?** The engine is browser-first (`CONSTITUTION.md` §6). A parser that only runs in Node constrains where import can happen and must be admitted deliberately, not by accident.
+- **Is its output deterministic for the same input bytes?** Import feeds Preview, semantics and Kiln. A parser that produces differently ordered or differently named output across runs undermines `CONSTITUTION.md` §16 and the canonical identity work accepted at revision `798bd89`.
+
+### 23.4 Format-specific notes
+
+- **glTF/GLB** is the likely first interoperability consumer because the current graphics stack makes it cheapest and because engine-owned normalization targets already exist. That is an observation about cost. It is not an authorization, and it does not make glTF the native pipeline.
+- **FBX** remains a long-term compatibility requirement because public users have large existing pipelines built around it. It is a proprietary format with a harder parsing story, and it should be expected to need a dependency rather than a native implementation.
+- **Image and audio decoding** follow the same sovereignty rules. Where the browser already decodes a format natively, prefer the platform over a dependency.
+
+### 23.5 Bundle impact
+
+An importer belongs to authoring, not to ordinary runtime. `CONSTITUTION.md` §5 requires that a small exported game not automatically ship the entire authoring toolchain, so an import dependency must not become a transitive cost of `engine/runtime`.
+
+---
+
+## 24. Final Law
 
 Third-party code is leverage.
 

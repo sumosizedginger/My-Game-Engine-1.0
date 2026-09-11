@@ -1290,6 +1290,22 @@ The following are intentionally deferred and must not be interpreted as missing 
 
 A proof or explicit human decision can promote deferred work later.
 
+### 37.1 Promotion by the general-engine product decision
+
+GENERAL-ENGINE-DIRECTION-001 promoted several entries above from *deferred* to **long-term product requirement, architecture recorded, implementation not yet earned**.
+
+Promotion changes what the architecture must not foreclose. It does not authorize implementation, and it does not remove anything from this deferred list for present work.
+
+| Entry | Status after promotion |
+| --- | --- |
+| huge-world streaming | Boundary recorded in §46. Implementation deferred. |
+| multiplayer/networking | Boundary recorded in §47. Implementation deferred. |
+| visual scripting | Scoped to three domains and recorded in §45. General-purpose visual scripting remains deferred permanently. |
+| universal asset import/export ecosystem | Import *normalization boundary* recorded in §44. A universal ecosystem remains deferred. |
+| advanced physics, navigation, mobile-first, native wrappers, plugin marketplace, advanced GI, volumetrics, TAA, clustered lighting, realistic face/cloth/hair, decorative Motion DSL, editor undo infrastructure | Unchanged. Still deferred. |
+
+See `PRD.md` §31 to §39 for the product requirements these boundaries serve.
+
 ---
 
 ## 38. Proof-to-Architecture Mapping
@@ -1398,3 +1414,269 @@ The architecture exists to make game creation more reachable, inspectable, repro
 Every major abstraction must eventually justify itself in a running game.
 
 If a simpler design survives the same proofs and preserves the Constitution, prefer the simpler design.
+
+---
+
+# PART II — CROSS-SYSTEM BOUNDARIES FOR THE EXPANDED ENGINE
+
+*Added by GENERAL-ENGINE-DIRECTION-001. Sections 1 to 42 describe the architecture as originally scoped and remain in force, including §42.*
+
+*This part records **boundaries**, not designs. Its purpose is to stop present work from accidentally foreclosing accepted future product requirements. It deliberately does not specify APIs, node types, message formats, file parsers or schemas: those belong in earned subsystem specifications under `docs/spec/`, created only after implementation earns them.*
+
+*Nothing in this part is implemented. Nothing in this part authorizes implementation.*
+
+---
+
+## 43. Scene and Composition Architecture
+
+### APPROVED FUTURE SYSTEM — NOT IMPLEMENTED
+
+A repository audit identified this as the largest structural gap between the current engine and a general-purpose engine. There is presently no engine-owned scene or composition model. Each proof assembles its own renderer scene independently, which is correct for a bounded proof and insufficient for a general engine.
+
+Seven accepted future requirements depend on this model existing first: prefabs and instancing, save and persistence, story and quest references to world objects, Studio inspection, world streaming, networking, and MMO persistence. It is therefore a keystone rather than one feature among many.
+
+### 43.1 Concepts the model must eventually carry
+
+```text
+scene / level identity
+parent-child hierarchy
+local and world transform relationships
+collections / groups
+prefabs / templates
+instances
+persistent IDs
+serialization
+loading and unloading
+chunk / region ownership
+world state
+```
+
+### 43.2 Boundaries that must hold
+
+- **No monolithic scene singleton.** A global mutable scene forecloses both server-authoritative simulation (§47) and partial world residency (§46).
+- **Runtime identity is not persistent identity.** §8 and `CONSTITUTION.md` §14 already govern this. A scene model must not reintroduce serialized runtime handles through a side door.
+- **Transform authority is unchanged.** §9 and `CONSTITUTION.md` §13 continue to govern who may write a transform. A hierarchy does not create a second writer.
+- **Composition does not own rendering.** What exists in a scene and what is submitted to the GPU are separate questions (§48).
+
+### 43.3 What must not be done yet
+
+Do not specify the scene API before a forcing consumer earns it. A constructed playable environment is the natural first consumer; a renderer demonstration is not. Over-specifying this model before a real game pulls on it is precisely the failure `CONSTITUTION.md` §32 exists to prevent.
+
+---
+
+## 44. External Asset Normalization Boundary
+
+### APPROVED FUTURE SYSTEM — NOT IMPLEMENTED
+
+`PRD.md` §36 makes external asset interoperability a long-term product requirement. This section records the only architectural commitment that requirement makes.
+
+```text
+EXTERNAL FORMAT
+      |
+      v
+IMPORT ADAPTER          <- format knowledge lives here and nowhere else
+      |
+      v
+ENGINE-OWNED NORMALIZED REPRESENTATION
+      |
+      v
+PREVIEW / SEMANTICS / KILN
+      |
+      v
+RUNTIME
+```
+
+### 44.1 The boundary rule
+
+**A foreign format never becomes internal authority.** Format knowledge is confined to its adapter. Nothing downstream of the adapter may branch on which format an asset came from.
+
+The practical test: deleting an importer must remove the ability to *ingest* that format and must not break anything already ingested.
+
+### 44.2 Normalization targets already exist
+
+MeshIR, its canonical codec, semantic parts, semantic anchors, Material Forge definitions, the Previewable contract and the Preview Lab are engine-owned normalized representations accepted at revision `798bd89`. An import adapter has somewhere to land today. This is why glTF/GLB is the cheapest first interoperability consumer, and it is an observation about cost, not an authorization.
+
+### 44.3 Provenance
+
+An imported asset carries provenance: what it came from, which adapter produced it, and at which revision. §36 already governs provenance architecture and applies unchanged. An asset whose origin cannot be explained is the failure mode named in `PRD.md` §2.
+
+### 44.4 Dependencies
+
+A format parser may be admitted as a dependency only through `DEPENDENCY_POLICY.md`, only behind its adapter, and never as a type that appears in engine-owned representation.
+
+---
+
+## 45. Visual Graph Source-Truth Architecture
+
+### APPROVED FUTURE SYSTEM — NOT IMPLEMENTED
+
+`PRD.md` §34 establishes the Two-Door Law and §35 scopes visual authoring to animation state logic, story/quest/dialogue, and timelines/cinematics.
+
+### 45.1 The single-truth rule
+
+```text
+        HUMAN DOOR                 AI / CODE DOOR
+      visual editor                public API
+             \                        /
+              \                      /
+               v                    v
+          ONE MACHINE-READABLE GRAPH
+             (project data)
+                    |
+                    v
+        compile / validate / execute
+```
+
+A visual editor is a **view and an input method** over a data model that exists independently of it. The data model is the architecture; the editor is not.
+
+### 45.2 Boundaries that must hold
+
+- **No editor-only state.** Any state that affects behavior must be in the data model and readable through the code door. Purely cosmetic editor state — node screen positions, collapsed groups, colour tags — may exist, must be clearly separated, and must never affect execution or identity.
+- **Determinism.** Graph evaluation follows `CONSTITUTION.md` §12 and §16. A graph does not create its own frame loop and does not use uncontrolled randomness.
+- **Transform authority.** A graph that drives motion commits through the transform owner (§9). It does not write transforms directly.
+- **Standard JavaScript is not replaced.** §12 and `CONSTITUTION.md` §11 stand. Graphs express state machines and schedules; scripts express computation.
+
+### 45.3 Scope discipline
+
+Three domains earn graph representation because each is genuinely a state machine or a schedule. General gameplay logic is not, and a general-purpose visual programming system remains deferred permanently (§37.1).
+
+---
+
+## 46. Large-World Composition Boundary
+
+### APPROVED FUTURE SYSTEM — NOT IMPLEMENTED
+
+```text
+WORLD
+  |
+  +-- REGIONS / ZONES
+        |
+        +-- CHUNKS / CELLS
+              |
+              +-- ACTIVE RUNTIME SET
+```
+
+Behavior: load ahead, retain nearby, unload behind.
+
+### 46.1 The binding constraint is negative
+
+Present work is not required to implement residency. It is required not to assume its absence:
+
+- **Do not assume the entire world is permanently loaded.** Code that iterates "all entities" or "all objects in the world" as a correctness requirement forecloses streaming.
+- **Persistent state must survive unloading.** An object that is unloaded and reloaded is the same object. This requires persistent identity (§48) and is why scene composition (§43) must precede streaming.
+- **Residency is not visibility.** Culling and level-of-detail are rendering concerns; residency is a simulation and memory concern. Conflating them produces a system that cannot simulate an unloaded region and cannot unload a visible one.
+
+### 46.2 Deferred within this boundary
+
+Chunk compilation, LOD/HLOD generation, terrain and object streaming, NPC activation, background simulation, navigation regions, audio regions, lighting regions and world-origin strategy are all deferred. Each needs its own evidence, and several need a forcing consumer that does not yet exist.
+
+---
+
+## 47. Client/Server Authority Boundary
+
+### APPROVED FUTURE SYSTEM — NOT IMPLEMENTED
+
+`PRD.md` §37.3 makes networking a long-term product requirement because of the planned MMO consumer. No networking is authorized.
+
+### 47.1 The binding constraint is negative
+
+```text
+DO NOT introduce architecture that requires a global singleton
+incompatible with authoritative server simulation.
+```
+
+Concretely, present work should avoid:
+
+- module-level mutable state that assumes exactly one world, one player or one simulation per process;
+- systems that can only be driven by input polled from a browser device;
+- simulation that reads presentation state, which does not exist on a server;
+- identity that is only meaningful inside one client process (§48).
+
+### 47.2 What this does not require
+
+It does not require present code to be network-aware, to carry a transport abstraction, or to separate client and server today. It requires that doing so later is a change rather than a rewrite.
+
+### 47.3 Static export is unaffected
+
+`CONSTITUTION.md` §6 requires that an ordinary exported game boot from static hosting with no mandatory application server. A networked game is not an ordinary exported game. Both remain true.
+
+---
+
+## 48. Identity Model — Authoring, Gameplay, Render Group, Persistent, Network
+
+### PARTLY IMPLEMENTED — BOUNDARY RECORDED HERE
+
+The CINDER MK-I capability benchmark (accepted at revision `798bd89`) surfaced a distinction that was previously implicit and is now explicit architecture.
+
+```text
+AUTHORING / EVIDENCE PART IDENTITY
+  What the asset source declares and what evidence can name.
+  CINDER: 227 semantic parts.
+  IMPLEMENTED — MeshIR part table, semantic anchors.
+
+GAMEPLAY OBJECT IDENTITY
+  What the game treats as a thing that can be addressed, hit, carried,
+  destroyed or saved.
+  NOT the same as authoring parts. A rail tooth is not a game object.
+
+RUNTIME RENDER-GROUP IDENTITY
+  What the renderer submits as one unit of work.
+  CINDER: 227 render groups, 227 measured draw calls.
+
+PERSISTENT IDENTITY
+  What survives a save, a reload and an unload/reload cycle.
+  Governed by CONSTITUTION.md Sections 14 and 15.
+
+NETWORK IDENTITY
+  What a server and a client agree refers to the same thing.
+  NOT IMPLEMENTED.
+```
+
+### 48.1 These are five identities, not one
+
+They coincide today only because the engine is small. Treating them as one concept is the mistake this section exists to prevent. In particular, **authoring granularity must not be assumed to equal gameplay granularity or render granularity.** Nothing requires every decorative rivet, rail tooth or vent to be a separately addressable game object or a separate GPU submission.
+
+### 48.2 The measured coupling
+
+`src/render/mesh-adapter.js` currently emits one render group per MeshIR part. Semantic authoring granularity therefore determines render-submission granularity, mechanically and without a decision having been made.
+
+The CINDER measurement is:
+
+```text
+227 semantic authoring parts -> 227 render groups -> 227 measured draw calls
+```
+
+**What this establishes:** a demonstrated scaling pressure, and a coupling between two identities that architecture says should be separable.
+
+**What this does not establish:** that draw calls are the dominant runtime performance cost. No profiling has been performed. The frame-time contribution of render submission in this engine is currently unmeasured.
+
+The correct sequence is therefore measurement before optimization. See `ROADMAP.md` for the recorded ordering. Kiln (§6) is the architecturally correct home for a future decoupling — compiling rich authoring state into cheaper runtime state is its stated purpose — but the decision to build that decoupling requires evidence that does not yet exist.
+
+### 48.3 Semantics survive compilation
+
+Whenever a future compilation step does reduce render groups, source semantics must survive it. A compiled artifact must retain a mapping from each source authoring part to its compiled location, so diagnostics, gameplay and evidence can still identify authored pieces without requiring an independent GPU submission per piece. Destroying semantic source identity to optimize rendering is prohibited.
+
+---
+
+## 49. Supported Public Surface Boundary
+
+### REQUIRED DIRECTION — RECONCILIATION NOT YET PERFORMED
+
+`CONSTITUTION.md` §5 establishes two entry points. §30 establishes the public API boundary. This section records an audit finding against them.
+
+### 49.1 The finding
+
+Significant accepted, implemented capability — including Character Forge, Motion Forge and World Forge — is not generally reachable through the supported public `engine/full` surface. `src/full/index.js` states this deliberately and accurately; the defect is that the deliberate choice has never been revisited against the public-release product target.
+
+### 49.2 The rule
+
+```text
+IMPLEMENTED + ACCEPTED + INTENDED FOR EXTERNAL AUTHORING
+        -> MUST HAVE A SUPPORTED PUBLIC ROUTE
+```
+
+### 49.3 Constraints on satisfying it
+
+- **A deep import is not a public API.** Importing an internal module path is an unsupported workaround that silently freezes internal structure into the public contract.
+- **Exposure is a decision, not a default.** Not every internal module should be public. §5 requires that an ordinary exported game not ship the entire authoring toolchain, and that constraint is unchanged.
+- **Reconciliation is its own tranche.** No export change is authorized here.

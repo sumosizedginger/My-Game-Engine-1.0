@@ -1,20 +1,63 @@
-# MY GAME ENGINE 1.0 — AUTHORIZED WORK ORDER
+# MY GAME ENGINE 1.0 — COMPLETED WORK ORDER (HISTORICAL)
 
 ## AI-NATIVE CONTENT PIPELINE — AI-ASSET-FOUNDATION-001
 
 | Field | Value |
 | --- | --- |
-| Document status | **AUTHORIZED WORK ORDER** |
+| Document class | **TEMPORARY WORK ORDER** (see `DOCUMENTATION_MAP.md` §2) |
+| Document status | **COMPLETE — RETAINED FOR REFERENCE** |
+| Authority | **Subordinate to every permanent document.** This file does not define architecture. |
 | Supersedes | The architecture-alignment audit request formerly held at this path (preserved in git history) |
 | Audit gate | **SATISFIED** — the A–G repository audit was delivered and accepted |
-| Active tranche | **AI-ASSET-FOUNDATION-001** |
-| Implementation status | **NOT AUTHORIZED** — the implementation plan requires separate human approval |
+| Tranche | **AI-ASSET-FOUNDATION-001** |
+| Implementation status | **COMPLETE, INDEPENDENTLY VERIFIED, HUMAN ACCEPTED AND MERGED** |
+| Accepted implementation revision | `798bd89c006f20f0b9a9f20b05443b6493436d14` |
+| Accepted merge commit | `07e555af55f5ee61f8fbef7fbd2da90d6d782419` |
 | Canonical repository | `sumosizedginger/My-Game-Engine-1.0` |
-| Last revised | 2026-09-10 |
+| Last revised | 2026-09-11 (reclassified by GENERAL-ENGINE-DIRECTION-001) |
 
-**If you are a fresh coding agent with no conversational context, read this file top to bottom before touching anything.** It is the current authorized truth. Do not re-run the architecture audit; it is complete and its findings are recorded in section 3.
+---
 
-The repository is still authoritative over this document. Where repository evidence contradicts a claim here, **stop and report the conflict** rather than silently choosing a side.
+## READ THIS FIRST — AUTHORITY NOTICE
+
+**This file is a completed temporary work order. It is not current authorized truth, and it does not outrank permanent documentation.**
+
+Its tranche, AI-ASSET-FOUNDATION-001, was implemented, independently verified and accepted. The work it authorized is done.
+
+Authority order, per `DOCUMENTATION_MAP.md` §1:
+
+```text
+CONSTITUTION.md > PRD.md > ARCHITECTURE.md
+  > permanent subsystem specifications
+  > DEPENDENCY_POLICY.md
+  > DEFINITION_OF_DONE.md / TESTING_AND_VALIDATION.md
+  > accepted evidence
+  > ROADMAP.md
+  > CONTEXT.md
+  > THIS FILE
+```
+
+Where this file and any permanent document disagree, **the permanent document wins**. Where this file and accepted implementation disagree, the implementation and its tests are the evidence.
+
+### Why it is still here
+
+Eleven source files and one test file cite this path for specific numbered Decisions — for example `src/render/mesh-adapter.js` cites Decision 6, `src/preview/manifest.js` cites Decision 2, and `src/geometry/mesh-ops.js` cites the topology law in section 5. Those citations are load-bearing explanations of why the code is shaped as it is.
+
+Moving or deleting this file would break every one of them. Retiring it therefore requires a tranche authorized to edit source headers, which this documentation tranche is not. That retirement is recorded as future work in `ROADMAP.md`.
+
+### What remains open
+
+Section 13 of this file recorded six documentation reconciliation items. GENERAL-ENGINE-DIRECTION-001 did not close all of them. Their current status is tracked in `ROADMAP.md`, not here.
+
+### For a fresh agent
+
+Read `AGENTS.md`, then `DOCUMENTATION_MAP.md`, then the permanent documents that map routes you to. Read this file only when you need the reasoning behind a Decision that source code cites, or the history of the AI-native asset tranche.
+
+Do not treat anything below this notice as an instruction to act.
+
+---
+
+*Everything below this line is preserved as written when the tranche was authorized. It is historical record. Its forward-looking language — "not authorized", "next action", "stop" — refers to the state of the work in September 2026 and no longer describes anything current.*
 
 ---
 

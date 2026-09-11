@@ -641,15 +641,37 @@ Examples should use public APIs and participate in automated validation where pr
 
 The initial canonical knowledge system contains 12 project documents.
 
-The maximum intended canonical durable set is 21 as subsystem specifications are earned.
+The maximum intended **core** canonical durable set is 21 as core subsystem specifications are earned.
+
+Earned permanent subsystem specifications under `docs/spec/` sit outside that core maximum. They are permanent and authoritative within their own subsystem, but they are governed by progressive disclosure, implementation-backed authority, and `DOCUMENTATION_MAP.md` routing rather than by the core count.
+
+The ceiling exists for one reason, and that reason is unchanged: an agent must never be required to load the entire engine's documentation to perform one bounded task. Growing the engine must not grow the mandatory reading set. A core document consumes that attention because core documents govern every task. A subsystem specification that is loaded only when its subsystem is under work does not.
 
 Model adapters, ADRs, learning documents, and community/legal files are outside that count.
 
-Do not exceed the canonical set casually. Before adding another authority document, ask whether the information belongs in an existing authority.
+Do not exceed the core canonical set casually. Before adding another core authority document, ask whether the information belongs in an existing authority, and whether it is genuinely cross-cutting rather than subsystem-scoped.
+
+A permanent subsystem specification is earned by implementation, never by intention. Do not create speculative or placeholder specifications, at root or under `docs/spec/`.
 
 Temporary work orders, audits, handoffs, and conversations are not permanent architecture.
 
 When temporary discovery becomes durable, encode it in code/tests/schemas/permanent docs and remove obsolete scaffolding.
+
+### 29.1 Amendment Record
+
+Amended under §34 by GENERAL-ENGINE-DIRECTION-001.
+
+**Old law:** "The maximum intended canonical durable set is 21 as subsystem specifications are earned."
+
+**New law:** the maximum of 21 applies to the **core** canonical durable set. Earned permanent subsystem specifications under `docs/spec/` are outside that count.
+
+**Reason and evidence:** the accepted product direction expands this repository toward a publicly released general-purpose engine. A repository-grounded audit found roughly a dozen domains that may eventually earn permanent specifications, against three remaining core slots. One global count therefore forced a false choice between an under-documented engine and one that dilutes every agent's context. Splitting the count preserves the ceiling's actual purpose — bounded mandatory reading — more faithfully than the single number did.
+
+**Affected documents:** `DOCUMENTATION_MAP.md` (document classes, authority order, core count semantics, routing) and `ROADMAP.md` (document roadmap).
+
+**Migration implications:** none mechanical. No existing document moves. `GAMEPLAY_FOUNDATION.md`, `GEOMETRY_FORGE.md`, `CHARACTER_FORGE.md`, `MOTION_FORGE.md`, `MATERIAL_FORGE.md` and `WORLD_FORGE.md` are grandfathered at their current root paths and remain equal in subsystem authority to any future `docs/spec/` specification.
+
+**Does accepted behavior become invalid?** No. No law governing implementation changed. No accepted implementation, test, evidence, public behavior or acceptance decision is affected by this amendment.
 
 ---
 

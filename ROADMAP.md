@@ -531,7 +531,7 @@ GEOMETRY_FORGE.md   (if not already earned earlier)
 MATERIAL_FORGE.md
 ```
 
-`AUDIO_AND_FX.md` is created only if the subsystem has become substantial enough to deserve permanent independent authority.
+An audio specification is created only if the subsystem has become substantial enough to deserve permanent independent authority. Since §48.2 it belongs at `docs/spec/audio.md` rather than at a reserved root slot.
 
 ## 31. B2 Gate
 
@@ -743,6 +743,98 @@ After E, or earlier only when a current proof concretely requires them, consider
 
 Each must enter through a bounded requirement and its own evidence.
 
+That rule is unchanged and is the reason the sections below are ordered rather than listed. GENERAL-ENGINE-DIRECTION-001 recorded an expanded product target in `PRD.md` Part II. It did not convert this roadmap into a feature checklist, and future tranches must not either.
+
+---
+
+## 46.1 Performance: measure before optimizing
+
+**Nothing here is authorized. This section records sequencing, not permission.**
+
+The CINDER MK-I benchmark established a measured fact:
+
+```text
+227 semantic authoring parts -> 227 render groups -> 227 measured draw calls
+```
+
+`src/render/mesh-adapter.js` emits one render group per MeshIR part, so semantic authoring granularity currently determines render-submission granularity. `ARCHITECTURE.md` §48 records why those are different identities that should be separable.
+
+**What this establishes:** a demonstrated scaling pressure, and a coupling that architecture says should not be automatic.
+
+**What this does NOT establish:** that draw calls are the dominant runtime performance cost. No profiling has been performed. The frame-time contribution of render submission in this engine is unmeasured.
+
+Documentation and work orders must therefore not claim that render batching is the proven next bottleneck. The correct sequence is:
+
+```text
+PERFORMANCE-BASELINE-001
+        |
+        v
+    measurement
+        |
+        v
+determine whether KILN-RENDER-001 or some other optimization
+is actually justified by the evidence
+```
+
+A baseline would plausibly measure CPU frame time, render time where observable, draw-call scaling, part-count scaling, triangle scaling, multiple-instance scaling, resource counts, and browser or GPU behavior. Budgets are not invented before a baseline exists (§24 of `DOCUMENTATION_MAP.md`, and `CONSTITUTION.md` §31).
+
+If measurement shows render submission is not the dominant cost, KILN-RENDER-001 is not the next work, and that outcome is a success of this sequencing rather than a disappointment.
+
+Kiln remains the architecturally correct home for any future decoupling: `CONSTITUTION.md` §4 and `ARCHITECTURE.md` §6 already make compiling rich authoring state into cheap runtime state its stated purpose. Whenever that work happens, source semantics must survive compilation (`ARCHITECTURE.md` §48.3).
+
+---
+
+## 46.2 Scene and composition
+
+**Not authorized. Recorded because it is the largest identified structural gap.**
+
+There is no general engine-owned scene or composition model. Each proof assembles its own renderer scene, which was correct for bounded proofs and is insufficient for a general-purpose engine.
+
+`ARCHITECTURE.md` §43 records the boundaries. Seven accepted future requirements sit on top of it: prefabs and instancing, save and persistence, story and quest references to world objects, Studio inspection, streaming, networking, and MMO persistence.
+
+It therefore sits early in any general-engine sequence. It must not be designed before a forcing consumer exists: a constructed playable environment is the natural first consumer, and a renderer demonstration is not.
+
+---
+
+## 46.3 Public surface reconciliation
+
+**Not authorized. Recorded as a scheduling defect against the public-release target.**
+
+Accepted implemented capability — including Character Forge, Motion Forge and World Forge — is not generally reachable through the supported public `engine/full` surface. `src/full/index.js` states this deliberately; what was never revisited is whether that choice still holds now that public release is a product requirement.
+
+`PRD.md` §39 states the rule and `ARCHITECTURE.md` §49 states the constraints. A deep import is not a public API, and not everything internal should become public. Reconciliation needs its own bounded tranche.
+
+---
+
+## 46.4 Accessibility and localization
+
+**Not authorized. Recorded because it was missing from implementation and documentation alike.**
+
+`PRD.md` §38 makes this a public-product requirement. The near-term obligation is compatibility rather than implementation: public APIs added now should not foreclose control remapping, subtitles, text scaling, colour modes or locale switching.
+
+No accessibility subsystem has earned a specification, and none should be created.
+
+---
+
+## 46.5 Retiring the completed asset-foundation work order
+
+**Not authorized in a documentation-only tranche.**
+
+`Next step.md` is a completed temporary work order, reclassified as historical by GENERAL-ENGINE-DIRECTION-001. It cannot yet be archived to `docs/archive/` because eleven source files and one test file cite its path for specific numbered Decisions — for example `src/render/mesh-adapter.js` (Decision 6), `src/preview/manifest.js` (Decision 2), `src/geometry/mesh-ops.js` (the topology law in section 5).
+
+Retiring it requires a tranche authorized to edit those source headers, which must either relocate the reasoning into the relevant permanent specifications or repoint the citations. `CONSTITUTION.md` §29 requires that durable content move into permanent documents and obsolete scaffolding be removed, so this is a real obligation rather than housekeeping.
+
+Section 13 of that file also recorded six documentation reconciliation items. Their status after this tranche:
+
+| Item | Status |
+| --- | --- |
+| AI-native laws reconciled into `CONSTITUTION.md` and `PRD.md` | **Partly closed.** §29 amended; `PRD.md` Part II added. A full reconciliation of section 1.4 was not attempted. |
+| `README.md` describes `/full` and Forge reachability accurately | **Closed** by this tranche. |
+| WebGPU preference versus universal `WebGLRenderer` use (finding 3.12) | **OPEN.** Needs a rendering tranche, not a documentation edit. |
+| `GEOMETRY_FORGE.md` should record the topology law and authoring-versus-render geometry separation | **OPEN.** |
+| `CHARACTER_FORGE.md` and `MATERIAL_FORGE.md` should record finding 3.7 | **OPEN.** |
+| Finding 3.6, silent merge drop, recorded as a known defect with an owner | **OPEN.** |
+
 ---
 
 # DOCUMENT ROADMAP
@@ -756,28 +848,49 @@ The canonical set may grow as real subsystems earn independent durable specifica
 Intended maximum without explicit human approval:
 
 ```text
-21 canonical project documents
+21 CORE canonical project documents
 ```
 
-## 48. Potential Earned Subsystem Documents
+Amended by `CONSTITUTION.md` §29.1: the ceiling counts **core** documents. Earned permanent subsystem specifications under `docs/spec/` sit outside it. See §48.
 
-The nine planned candidates are:
+## 48. Earned Subsystem Documents
+
+`CONSTITUTION.md` §29 was amended by GENERAL-ENGINE-DIRECTION-001. The ceiling of 21 now applies to the **core** canonical set. Earned permanent subsystem specifications under `docs/spec/` sit outside that count.
+
+### 48.1 Core subsystem specifications — earned and grandfathered
 
 ```text
-13 GAMEPLAY_FOUNDATION.md
-14 GEOMETRY_FORGE.md
-15 CHARACTER_FORGE.md
-16 MOTION_FORGE.md
-17 MATERIAL_FORGE.md
-18 WORLD_FORGE.md
-19 AUDIO_AND_FX.md
-20 PERFORMANCE_AND_PROFILING.md
-21 VISUAL_TARGETS_AND_BENCHMARKS.md
+13 GAMEPLAY_FOUNDATION.md   (Proof A)
+14 GEOMETRY_FORGE.md        (Proof B2)
+15 CHARACTER_FORGE.md       (Proof B1)
+16 MOTION_FORGE.md          (Proof B1)
+17 MATERIAL_FORGE.md        (Proof B2)
+18 WORLD_FORGE.md           (Proof C)
 ```
 
-Do not pre-create them as empty shells.
+These remain at repository root. They are not moved: relocating them would churn cross-references across `DOCUMENTATION_MAP.md`, the learning documents and source file headers for no routing benefit.
 
-Create them when implementation reaches the corresponding domain and permanent independent authority is genuinely useful.
+### 48.2 Reserved core slots
+
+```text
+19 PERFORMANCE_AND_PROFILING.md      reserved, not created
+20 VISUAL_TARGETS_AND_BENCHMARKS.md  reserved, not created
+21 (intentionally unallocated)
+```
+
+Both reserved documents stay at core level because each is cross-cutting policy read by every tranche touching performance or appearance, rather than one subsystem's behavior. Neither may be created before implementation evidence earns it. The unallocated slot is deliberate flexibility.
+
+`AUDIO_AND_FX.md` is no longer a reserved root slot. Audio is subsystem-scoped, so when audio implementation earns a specification it belongs at `docs/spec/audio.md`.
+
+### 48.3 Future earned specifications
+
+```text
+docs/spec/<domain>.md
+```
+
+Outside the core count, created only after real accepted implementation makes one useful. See `DOCUMENTATION_MAP.md` §4.3.
+
+Do not pre-create any of them as empty shells. Do not create `docs/spec/` itself until its first earned document exists.
 
 ## 49. Learning Documents
 
@@ -965,6 +1078,43 @@ Unless a proof creates concrete evidence otherwise, defer:
 
 Deferred items remain visible so future agents do not repeatedly "rediscover" them as urgent opportunities.
 
+## 56.1 Reclassification by the general-engine product decision
+
+GENERAL-ENGINE-DIRECTION-001 changed the **long-term** status of several entries above. The list itself was not wrong, and this is not a correction of it. Most entries were already conditioned on sequence, and those conditions were the right call.
+
+The new status is:
+
+```text
+LONG-TERM PRODUCT REQUIREMENT
+NOT YET EARNED
+PROOF-GATED
+```
+
+That means the finished product must eventually do it, no implementation exists, and a real forcing consumer must still earn it. It is not an authorization, and it does not move anything out of the deferred list for present work.
+
+| Entry | New long-term status |
+| --- | --- |
+| multiplayer/networking | Long-term product requirement (`PRD.md` §37.3). Boundary in `ARCHITECTURE.md` §47. Deferred for implementation. |
+| huge-world streaming | Long-term product requirement (`PRD.md` §37.1). Boundary in `ARCHITECTURE.md` §46. Deferred for implementation. |
+| GLTF/FBX-first native production pipeline | **Unchanged and still deferred permanently.** Foreign formats never become the native pipeline. Import *interoperability* is separate and is now required (`PRD.md` §36, `ARCHITECTURE.md` §44). |
+| universal asset import/export ecosystem | A universal ecosystem stays deferred. Bounded import adapters are long-term requirements. |
+| visual scripting | Now required for three specific domains — animation state logic, story/quest/dialogue, timelines (`PRD.md` §35, `ARCHITECTURE.md` §45). General-purpose visual programming stays deferred permanently. |
+| mobile-first architecture, native wrappers | **Unchanged.** Browser remains first-class. Additional targets are earned by evidence. |
+| proprietary general-purpose scripting language | **Unchanged and permanent.** Standard JavaScript remains the substrate. |
+| ECS rewrite, plugin marketplace | **Unchanged.** Still deferred. |
+| GI, volumetrics, TAA, clustered lighting, shadow research | **Unchanged.** Still deferred. |
+| advanced physics, navmesh stack | **Unchanged.** Still deferred. |
+| high-end face generation, facial performance, cloth, dynamic hair | **Unchanged.** Still deferred. |
+| sculpt-editor stable editable vertex identity, editor undo architecture | **Unchanged.** Still deferred. |
+| Motion DSL before Motion IR proves semantics | **Unchanged.** Still deferred. |
+
+Two additions to the deferred register, neither previously recorded:
+
+| Addition | Status |
+| --- | --- |
+| accessibility and localization systems | Long-term product requirement (`PRD.md` §38). No implementation. No specification earned. |
+| general scene and composition model | Long-term requirement and the largest identified structural gap (`ARCHITECTURE.md` §43, §46.2 above). Needs a forcing consumer. |
+
 ---
 
 # ROADMAP CHANGE CONTROL
@@ -1053,17 +1203,58 @@ It does not block urgent repairs and does not pre-author future APIs.
 
 # CURRENT EXECUTION TARGET
 
-## 61. At Repository Bootstrap
+## 61. Phase Status Ledger and Current Target
 
-Unless an accepted handoff says otherwise, the first implementation target is:
+This section was stale until GENERAL-ENGINE-DIRECTION-001 repaired it. It previously still named Phase 0 as the first implementation target, long after Proofs A through E and the AI-native asset foundation had been accepted. A fresh agent reading it would have been actively misdirected.
 
-# PHASE 0 — REPOSITORY FOUNDATION
+**Whoever moves the baton next updates this section in the same tranche.** A roadmap that does not know where the project is provides no sequencing authority at all.
 
-The first builder receives a bounded work order to create the trustworthy project foundation and stop.
+### 61.1 Accepted phases
 
-The builder must not interpret this roadmap as authorization to continue directly into A0 or Proof A.
+Statuses use the vocabulary in §3. Each is supported by an accepted base revision, not by inference.
 
-The baton moves only after evidence and independent validation justify it.
+| Phase | Status | Accepted revision | Evidence |
+| --- | --- | --- | --- |
+| Phase 0 — Repository Foundation | **ACCEPTED** | superseded by later accepted work | repository exists, toolchain pinned, `engine/runtime` and `engine/full` split live |
+| A0 — Evaluation Harness | **ACCEPTED** | superseded by later accepted work | `npm run eval`, `artifacts/evaluation-report.json`, `src/eval/*` |
+| Proof A — Tiny Complete Game | **ACCEPTED** | `2c73c29450ed2412638a334bd90fb8919c1220a0` | `docs/learn/BUILDING_A_TINY_GAME.md`; evaluator checks `pongBoot`, `pongGameplay`, `pongScoring` |
+| Proof B1 — Motion Truth | **ACCEPTED** | `52eb3b3c91d725e9a73ebb1ea658b393a12029b4` | `docs/learn/BUILDING_A_WALKING_CHARACTER.md`; `b1*` evaluator checks |
+| Proof B2 — Procedural Combat Room | **ACCEPTED** | `3990f55858cab8c4e574f9f29ddb954e70919c77` | `docs/learn/BUILDING_A_PROCEDURAL_COMBAT_ROOM.md`; `b2*` evaluator checks |
+| Proof C — Bounded Procedural World | **ACCEPTED** | `e8fa4f698be684599f3839fec46ac3456b448698` | `docs/learn/BUILDING_A_BOUNDED_PROCEDURAL_WORLD.md`; `c*` evaluator checks |
+| Proof D — Different Genre | **ACCEPTED** | `5fb46b9a3da1a6896530afec86cd205d616e832f` | `docs/learn/BUILDING_A_DIFFERENT_GENRE.md`; `d*` evaluator checks |
+| Proof E — Blind API Generality | **ACCEPTED** | `c62975dbf68c2305e38c00b9cdc1ed5707777d4a` | `docs/learn/BUILDING_AN_UNPLANNED_GAME.md` |
+| AI-ASSET-FOUNDATION-001 | **ACCEPTED** | `798bd89c006f20f0b9a9f20b05443b6493436d14` | merged as `07e555af55f5ee61f8fbef7fbd2da90d6d782419` after independent verification |
+
+Acceptance evidence for the six proofs is the accepted learning material in `docs/learn/`, which §28 of `DOCUMENTATION_MAP.md` permits only after a proof is accepted, together with the base revision each lesson names.
+
+### 61.2 AI-ASSET-FOUNDATION-001
+
+Accepted and merged. It delivered engine-owned MeshIR with a canonical byte codec, the initial modeling verbs, generic semantic anchors and parts, the Previewable contract, the Preview Lab, the canonical view solver, `AssetPreviewManifest` with portable structural identity, deterministic canonical capture, and the CINDER MK-I capability benchmark.
+
+Independent verification at the accepted revision reproduced: Node v24.21.0, 429 tests passing, 43 evaluator checks passing, production build passing, 612,624 MeshIR bytes identical between Node and browser, portable structural identity across multiple viewport and aspect sizes, asset-relative canonical front and back views, deterministic camera-relative inspection lighting, correct lifecycle, and two six-view captures with zero differing pixels.
+
+### 61.3 Current target
+
+```text
+GENERAL-ENGINE-DIRECTION-001
+  documentation and product-direction reconciliation
+  no implementation
+```
+
+That is this tranche. It updates permanent product and architecture documentation so that future implementation can be designed toward the general-engine target without abandoning proof-driven discipline.
+
+### 61.4 What is NOT authorized
+
+No implementation tranche is currently authorized. In particular, none of the following may begin without its own bounded work order and human authorization:
+
+```text
+PERFORMANCE-BASELINE-001        see 46.1
+KILN-RENDER-001                 see 46.1 - requires the baseline first
+SCENE / COMPOSITION FOUNDATION  see 46.2
+public surface reconciliation   see 46.3
+```
+
+The baton still moves only after evidence and independent validation justify it.
 
 ---
 
