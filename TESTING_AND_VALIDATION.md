@@ -1023,7 +1023,66 @@ Stronger evidence may be required by a subsystem spec.
 
 ---
 
-## 37. Final Law
+## 37. Future Evidence Classes for the Expanded Engine
+
+### NONE OF THESE EXIST. THIS SECTION DESCRIBES WHAT WILL BE REQUIRED, NOT WHAT IS IMPLEMENTED.
+
+`PRD.md` Part II records product requirements that no current system satisfies. Each will eventually need an evidence class that the existing harness does not provide. Recording them now costs nothing and prevents a future tranche from inventing a weaker standard under deadline pressure.
+
+**No test in this section exists. No tranche is authorized by it.** When one of these systems is built, its evidence requirements are designed in that tranche and must meet or exceed what is sketched here.
+
+### 37.1 Scene and composition
+
+- **Serialization round trip.** A composed scene serialized and reloaded produces identical structural identity. Same discipline as the accepted portable structural manifest: identity must not depend on the machine, the window or the run.
+- **Hierarchy correctness.** Local and world transforms agree after reparenting, and transform authority (`CONSTITUTION.md` §13) is not violated by the hierarchy.
+- **Prefab and instance divergence.** An instance modified after creation does not silently mutate its template, and a template change propagates only where the model says it should.
+
+### 37.2 Persistence and save migration
+
+- **Version migration.** A save written by version N loads correctly under version N+1, with an explicit failure rather than silent corruption when it cannot.
+- **Identity survival.** Persistent identity survives save, reload, and an unload/reload cycle. Runtime handles never appear in a save file (`CONSTITUTION.md` §14, §15).
+
+### 37.3 Streaming and residency
+
+- **Unload/reload identity.** An object unloaded and reloaded is the same object, with the same persistent identity and the same state.
+- **Resource lifetime.** Repeated residency cycling releases GPU and DOM resources and does not accumulate listeners — the same standard §22 already applies to viewers.
+- **Simulation while unloaded.** Whatever the design promises about unloaded regions is asserted, not assumed.
+
+### 37.4 Import normalization
+
+- **Normalization, not passthrough.** An imported asset produces engine-owned representation. No vendor type escapes the adapter (`ARCHITECTURE.md` §44).
+- **Determinism.** The same input bytes produce the same normalized output and the same canonical identity across runs and runtimes, to the standard the accepted MeshIR codec already meets.
+- **Provenance.** Every imported asset can state what it came from, through which adapter, at which revision.
+- **Honest failure.** A malformed or unsupported file fails with a structured diagnostic. It does not produce a silently degraded asset.
+
+### 37.5 Visual graphs
+
+- **Two-door equivalence.** A graph authored through the visual editor and the same graph authored through the code API produce identical data and identical behavior. This is the test that enforces `PRD.md` §34, and without it the Two-Door Law is decorative.
+- **Determinism.** Identical graph plus identical inputs produce identical execution, under `CONSTITUTION.md` §12 and §16.
+- **No editor-only behavior.** Cosmetic editor state does not affect execution or identity.
+
+### 37.6 Networking
+
+- **Authority.** A client cannot change state the server owns.
+- **Replication correctness.** A replicated entity converges to server truth after divergence.
+- **Interest management.** A client receives only state relevant to it, asserted by what it does *not* receive.
+- **Failure behavior.** Disconnection, reconnection and server restart produce defined outcomes rather than undefined ones.
+
+### 37.7 Performance baseline methodology
+
+Performance claims require measurement (§ above, and `CONSTITUTION.md` §31). A baseline harness must state what it measures, how many samples, on what hardware and in which browser, and must report variance rather than a single number.
+
+It must distinguish measurement from inference. The current example: CINDER demonstrates 227 authoring parts producing 227 measured draw calls. That is a measurement. "Draw calls are the dominant frame cost" is an inference, and no evidence in this repository supports it yet.
+
+### 37.8 Accessibility and localization
+
+- **Rebinding.** Every action is rebindable, and rebinding survives a reload.
+- **Locale switching.** Switching locale changes presented text without changing game state or identity.
+- **No hard-coded presentation strings** in engine-owned code paths intended for public use.
+
+---
+
+## 38. Final Law
 
 The purpose of testing is not to create a wall of green badges.
 

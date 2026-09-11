@@ -39,9 +39,21 @@ Accepted implementation now includes:
 - Proof D: Different Genre, a bounded 3D arcade racer.
 - Proof E: Blind API Generality Test (Order Five, a bounded 3D collection/puzzle game).
 
+- AI-ASSET-FOUNDATION-001: engine-owned AI-native asset authoring.
+
 Proof E is accepted: a fresh blind participant successfully built Order Five through the documented public engine surface without core engine modification or private API bypass. This provides strong evidence of runtime and compiler public coherence, though it represents generality evidence rather than universal genre support.
 
+AI-ASSET-FOUNDATION-001 is accepted at revision `798bd89`, merged as `07e555a` after independent verification. It delivered engine-owned MeshIR with a canonical byte codec, generic modeling verbs, semantic parts and anchors, Material Forge definitions, the Previewable contract, the Preview Lab, an asset-relative canonical view solver, `AssetPreviewManifest` with portable structural identity, and deterministic canonical capture. Its forcing consumer, the CINDER MK-I capability benchmark, produced 227 semantic parts, 7,236 triangles and 13 materials entirely through the public authoring verbs.
+
 Proofs pull architecture. We do not build the entire engine first and hope a game eventually fits it.
+
+### Where this is going
+
+The engine is additionally intended to become a **publicly released, general-purpose** browser engine usable by other developers, capable over time of supporting games from small single-player projects to large persistent worlds.
+
+That target is recorded in [PRD.md](PRD.md) Part II and its cross-system boundaries in [ARCHITECTURE.md](ARCHITECTURE.md) Part II.
+
+**None of it is implemented.** Scene composition, physics, animation graphs, story and quest graphs, timelines, audio, runtime UI, save and persistence, asset import, streaming, networking and accessibility are product *direction*, not capability. Each is earned by a real forcing consumer and accepted through the normal proof, audit and verification chain. Nothing in this repository should be read as advertising a system that does not exist.
 
 ## Quick Start
 
@@ -65,7 +77,7 @@ The export contracts in [package.json](package.json) are:
 | --- | --- |
 | `@sumosizedginger/my-game-engine-1.0` | Defaults to the runtime exports for ordinary game consumption. |
 | `@sumosizedginger/my-game-engine-1.0/runtime` | Runtime and Gameplay Foundation primitives, without the definition compiler. |
-| `@sumosizedginger/my-game-engine-1.0/full` | Runtime exports plus the accepted authoring/compiler seam: `compileDefinition` and `createEngineFull`. |
+| `@sumosizedginger/my-game-engine-1.0/full` | Runtime exports plus the accepted authoring surface: `compileDefinition`, `createEngineFull`, and the AI-native asset authoring API earned by AI-ASSET-FOUNDATION-001 — MeshIR and its canonical codec, the modeling verbs, semantic anchors, Material Forge definitions, the Previewable contract, the Preview Lab, the canonical view solver and `AssetPreviewManifest`. |
 
 For example, project code in this repository can import:
 
@@ -78,7 +90,11 @@ import { compileDefinition }
 
 These package export names resolve under Node and Vite package self-reference. When developing games inside this repository, importing the same public barrel files by repository-relative path (for example, `../../runtime/index.js` or `../../full/index.js`) is also legitimate, because those files are the direct implementation targets of the public package exports.
 
-These names describe package exports, not npm publication status. The current `/full` export does not re-export every generation subsystem; repository-level Forge systems (such as `src/geometry/` or `src/material/`) are internal engine implementations rather than package subpath exports. Ordinary project code does not need them merely to create 3D presentation; direct Three.js project presentation remains fully legitimate where procedural forge compilation is not required.
+These names describe package exports, not npm publication status.
+
+**The `/full` export does not yet re-export every implemented subsystem.** Character Forge, Motion Forge, World Forge and Geometry Forge room generation exist in this repository and are accepted, but they are reachable only as internal repository implementations rather than package subpath exports. Ordinary project code does not need them merely to create 3D presentation; direct Three.js project presentation remains fully legitimate where procedural forge compilation is not required.
+
+That gap is a known, recorded finding rather than a design intent. Public release requires that accepted capability intended for external authoring be reachable through an intentional supported entry point, and a deep import into an internal module path is not one. See [PRD.md](PRD.md) §39 for the rule and [ARCHITECTURE.md](ARCHITECTURE.md) §49 for the constraints on closing it. Reconciling the public surface is future work with its own tranche; until it happens, treat internal module paths as unstable.
 
 ### Build Your First Game
 
@@ -171,7 +187,11 @@ Model adapters:
 
 Model adapters are routing shims, not independent sources of truth.
 
-The canonical durable set may grow to at most 21 project documents as real implementation earns subsystem specifications. Learning documentation, ADRs, and community/legal files are outside that canonical count.
+The **core** canonical durable set may grow to at most 21 project documents as real implementation earns subsystem specifications. Six have been earned so far — `GAMEPLAY_FOUNDATION.md`, `GEOMETRY_FORGE.md`, `CHARACTER_FORGE.md`, `MOTION_FORGE.md`, `MATERIAL_FORGE.md` and `WORLD_FORGE.md` — and they remain at repository root.
+
+Future earned subsystem specifications live under `docs/spec/` and are **outside** the core count, so the engine can grow subsystems without growing the set of documents every task must read. That directory does not exist yet, because no further specification has been earned. Learning documentation, ADRs, model adapters, and community and legal files are also outside the core count.
+
+See `CONSTITUTION.md` §29 for the law and `DOCUMENTATION_MAP.md` §4 for the routing.
 
 Use `DOCUMENTATION_MAP.md` to read the smallest authoritative set required for the active task.
 
@@ -183,7 +203,7 @@ When information conflicts, resolve it in this order:
 2. `CONSTITUTION.md`.
 3. `PRD.md`.
 4. `ARCHITECTURE.md`.
-5. Applicable permanent subsystem specification.
+5. Applicable permanent subsystem specification — the grandfathered root specifications and any earned specification under `docs/spec/`, equal in authority within their own subsystem.
 6. `DEPENDENCY_POLICY.md`.
 7. `DEFINITION_OF_DONE.md` and `TESTING_AND_VALIDATION.md`.
 8. Accepted running evidence: tests, captures, proof games, diagnostics.

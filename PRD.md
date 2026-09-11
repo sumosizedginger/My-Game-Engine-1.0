@@ -22,6 +22,14 @@ The product thesis is:
 
 > Humans and AI should be able to express game intent through stable, inspectable definitions and code while deterministic engine systems perform the repetitive mathematics and runtime work.
 
+### 1.1 Expanded product target
+
+The engine is additionally intended to become a **publicly released, general-purpose** game engine used by developers other than its owner, capable over time of supporting games from small single-player projects through to large persistent multiplayer worlds.
+
+That target does not change the thesis above and does not weaken the proof-driven discipline that governs implementation. It changes what the finished product must eventually be able to do.
+
+Sections 31 to 39 state the expanded requirements. Everything in those sections is **REQUIRED DIRECTION — NOT YET IMPLEMENTED** unless stated otherwise, and every one of them remains proof-gated: a requirement establishes that the engine must eventually be able to do something, never that it already can.
+
 ---
 
 ## 2. Problem Statement
@@ -151,6 +159,24 @@ The following are NOT required for the initial product path and MUST NOT be pull
 - realistic facial performance, advanced cloth simulation, or realistic dynamic hair as early blockers;
 - integrating Rapier, Recast, Manifold, meshoptimizer, or other optional dependencies merely because they may be useful later;
 - preserving earlier repository architecture for historical reasons.
+
+### 5.1 Status of these non-goals after the general-engine direction decision
+
+The list above remains accurate and was not a mistake. Most of its entries are already conditioned on sequence — "during the initial proof sequence", "before the bounded-world proof succeeds", "before project code proves it is needed" — and those conditions were the correct call at the time they were written.
+
+The general-engine product decision changes the **long-term** status of several of them. It does not retroactively invalidate any of them, and it does not authorize implementation.
+
+| Non-goal entry | Status now |
+| --- | --- |
+| multiplayer/networking during the initial proof sequence | Still a non-goal for the initial path. Networking is now a **LONG-TERM PRODUCT REQUIREMENT — NOT YET EARNED** (§37). |
+| universal GLTF/FBX-first asset pipeline | **Unchanged as written.** Foreign formats must never become the native authoring pipeline. Import *interoperability* is a separate and now-required capability (§36). |
+| giant-world streaming before the bounded-world proof succeeds | The bounded-world proof (Proof C) has succeeded, so this precondition is satisfied. Large-world capability is now a **LONG-TERM PRODUCT REQUIREMENT — NOT YET EARNED** (§37), still gated by a forcing consumer. |
+| visual scripting before project code proves it is needed | **Unchanged as written.** Visual authoring is now required for three specific domains (§35), and each remains gated on a forcing consumer. General-purpose visual scripting is still not a goal. |
+| mobile as the primary initial platform | **Unchanged.** The browser remains the first-class platform. Additional targets are earned by evidence. |
+| proprietary gameplay scripting language | **Unchanged and permanent.** Standard JavaScript remains the programming substrate. |
+| cloning Unity/Unreal/Godot/Blender; native DCC dependence; plugin marketplace; premature ECS rewrite | **Unchanged.** |
+
+Entries not listed in this table are unchanged.
 
 ---
 
@@ -869,3 +895,226 @@ My Game Engine 1.0 succeeds when a human or AI can build a real game by expressi
 The engine is not complete because it has many systems.
 
 It is complete when those systems form a small enough, clear enough, proven-enough machine that multiple different games can rely on them.
+
+---
+
+# PART II — EXPANDED PRODUCT DIRECTION
+
+*Added by GENERAL-ENGINE-DIRECTION-001. Sections 1 to 30 describe the product as originally scoped and remain in force. This part states what the engine must additionally become as a publicly released general-purpose engine.*
+
+*Nothing in this part is implemented. Nothing in this part authorizes implementation. Each requirement is earned by a real forcing consumer and accepted through the normal proof, audit and verification chain.*
+
+---
+
+## 31. Status Vocabulary for Expanded Requirements
+
+Every capability described in this part carries one of these statuses. A capability with no status stated defaults to the first.
+
+```text
+REQUIRED DIRECTION — NOT YET IMPLEMENTED
+  The product must eventually do this. No implementation exists.
+  A forcing consumer must earn it.
+
+APPROVED FUTURE SYSTEM
+  The architectural shape is decided and recorded in ARCHITECTURE.md.
+  Implementation still requires its own bounded work order.
+
+IMPLEMENTED — ACCEPTED
+  Real code exists, has passed audit and independent verification,
+  and is named with its accepted revision.
+```
+
+A product requirement is not a claim of capability. Documentation in this repository must never let future intent read as current behavior. When in doubt, state the status explicitly.
+
+---
+
+## 32. Public Release and Third-Party Developers
+
+**Status: REQUIRED DIRECTION — NOT YET IMPLEMENTED.**
+
+My Game Engine 1.0 is intended for public release and for use by developers who did not build it and will not read its internal architecture documents.
+
+That imposes requirements the original single-owner scope did not:
+
+- capabilities intended for external use must be reachable through an intentional supported entry point (§39);
+- public API documentation, published schemas and sample projects become release prerequisites;
+- breaking changes to public surfaces require migration guidance;
+- third-party developers arrive with existing assets and existing habits, and the engine must meet them without surrendering its own source truth (§36);
+- accessibility and localization become product requirements rather than optional polish (§38).
+
+Section 3 describes the engine's users. Third-party developers are now a first-class user class, not a hypothetical one.
+
+---
+
+## 33. General-Purpose Engine Scope
+
+**Status: REQUIRED DIRECTION — NOT YET IMPLEMENTED.**
+
+The engine must eventually provide enough reusable substrate that a developer can build a platformer, a shooter, an RPG, an adventure game, a strategy game, a simulation, a narrative game, a procedural game, a multiplayer game or a large persistent world without replacing half of the engine.
+
+This does not mean every genre-specific mechanic belongs in engine core. The rule from §6 stands and is strengthened here:
+
+> The engine provides reusable vocabulary. Games provide the sentence.
+
+A capability belongs in the engine when more than one genuinely different consumer needs it and the engine can express it generically. A capability that one game needs belongs to that game until a second consumer proves otherwise.
+
+The largest identified structural gap against this scope is the absence of a general engine-owned scene and composition model. See `ARCHITECTURE.md` §43 for the recorded direction and `ROADMAP.md` for its sequencing.
+
+---
+
+## 34. The Two-Door Law
+
+**Status: REQUIRED DIRECTION — NOT YET IMPLEMENTED.**
+
+Every important authoring system should eventually expose **two doors over one source truth**.
+
+```text
+HUMAN DOOR                      AI / CODE DOOR
+visual graphs                   definitions
+timelines                       schemas
+inspectors                      public APIs
+scene and world tools           commands
+asset browser                   scripts
+preview                         structured diagnostics
+import UI
+              \                /
+               \              /
+            ONE MACHINE-READABLE
+              PROJECT TRUTH
+```
+
+Both doors operate on the same underlying project data. A human editing a story graph visually and an AI editing it through code must be editing the same graph.
+
+**Prohibited:** a visual-editor truth plus a separate AI/code truth. Hidden editor state that code cannot read is the specific failure this law exists to prevent, and it is one of the problems named in §2.
+
+The governing principle:
+
+> Everything should be authorable through code, but not everything must be authored by typing code.
+
+"Code-native" describes where truth lives, not how a human must interact with it.
+
+---
+
+## 35. Visual Authoring for Animation, Story and Timeline
+
+**Status: REQUIRED DIRECTION — NOT YET IMPLEMENTED.**
+
+Visual authoring is required for three specific domains. It is not a general-purpose replacement for programming: standard JavaScript remains the gameplay programming substrate, and `CONSTITUTION.md` §11 still forbids a proprietary scripting language.
+
+**Animation state logic.** Idle, walk, run, aim, attack, reload and their transitions, conditions and blends.
+
+**Story, quest and dialogue.** Events, conditions, choices, branches, quest state, dialogue and encounter triggering.
+
+**Timelines and cinematics.** Camera, animation, dialogue, audio, music, VFX, gameplay events and scene transitions on a time axis.
+
+Each is a graph or timeline *data model* first and an editor second. The data model is the product requirement; the visual editor is one of its two doors (§34). An AI must be able to generate, inspect, test and modify exactly what the human sees.
+
+These three domains were chosen because each is genuinely a state machine or a schedule, which is where visual representation earns its cost. Ordinary game logic is not.
+
+---
+
+## 36. External Asset Interoperability
+
+**Status: REQUIRED DIRECTION — NOT YET IMPLEMENTED.**
+
+The native workflow remains AI to native definitions to Forges to Kiln to runtime. That is the preferred path and it does not change.
+
+Public developers will nevertheless arrive with existing assets and existing pipelines. The engine must eventually import them.
+
+```text
+EXTERNAL FORMAT
+      |
+      v
+IMPORT ADAPTER
+      |
+      v
+ENGINE-OWNED NORMALIZED REPRESENTATION
+      |
+      v
+PREVIEW / SEMANTICS / KILN
+      |
+      v
+RUNTIME
+```
+
+Formats expected to matter eventually include, at minimum: glTF/GLB, FBX, OBJ, PNG, JPEG, WebP, WAV, practical browser audio formats, and external animation data.
+
+Two rules govern all of them:
+
+1. **A foreign format never becomes permanent internal authority.** It is normalized into engine-owned representation at the boundary, exactly as §5 has always required.
+2. **Import is not the native pipeline.** The engine does not become a glTF runtime that happens to have authoring tools attached.
+
+glTF/GLB is the likely first interoperability consumer because the current graphics stack makes it cheapest, and because MeshIR, semantic parts, anchors and the Preview Lab already provide a normalization target. FBX remains a long-term compatibility requirement because public users have large existing pipelines built around it.
+
+No importer is authorized by this section.
+
+---
+
+## 37. Large Worlds, Networking and Persistence
+
+**Status: REQUIRED DIRECTION — NOT YET IMPLEMENTED.**
+
+There is a planned MMO consumer. Large-world and networked capability are therefore product requirements rather than hypotheticals. Neither is authorized for implementation, and neither may be built before the systems beneath them exist.
+
+### 37.1 Large worlds
+
+```text
+WORLD -> REGIONS / ZONES -> CHUNKS / CELLS -> ACTIVE RUNTIME SET
+```
+
+Conceptually: load ahead, retain nearby, unload behind.
+
+The binding constraint on present work is negative rather than positive: **do not assume the entire world is permanently loaded.** Persistent identity must survive unloading and reloading where the design requires it.
+
+### 37.2 Persistence
+
+Versioned saves, declared persistent state, migration, resume, persistent entity identity, world state, quest state, inventory and character state are all required eventually. `CONSTITUTION.md` §14 and §15 already govern the identity and save laws that make this possible; runtime entity handles must never become save identity.
+
+### 37.3 Networking
+
+Server authority, client/server separation, replication, interest management, network entity identity, prediction and reconciliation where appropriate, and server restart recovery are all required eventually.
+
+Interest management matters particularly: a client should receive only the state relevant to that client.
+
+The binding constraint on present work is again negative: **do not introduce architecture that requires global singletons incompatible with authoritative server simulation.** A design that works for one local player and forecloses a server is a design defect even while the engine is single-player.
+
+`CONSTITUTION.md` §6 continues to require that an ordinary exported game boot from static hosting without a mandatory application server. A networked game is not an ordinary exported game, and that law is not weakened by this section.
+
+---
+
+## 38. Accessibility and Localization
+
+**Status: REQUIRED DIRECTION — NOT YET IMPLEMENTED.**
+
+A publicly released engine must let its developers ship accessible and localized games. This was absent from both implementation and product documentation before this tranche.
+
+Required eventually: control remapping, subtitles, text scaling, colour and accessibility modes, localization tables, locale switching, and accessible UI paths.
+
+The near-term obligation is compatibility rather than implementation: public APIs added now should not foreclose these later. An input system with no rebinding concept, or a UI layer that hard-codes strings, creates work that is expensive to undo. No accessibility subsystem is authorized, and none has earned a specification.
+
+---
+
+## 39. Supported Public Surface Requirement
+
+**Status: REQUIRED DIRECTION — NOT YET IMPLEMENTED.**
+
+A repository audit found that significant accepted, implemented capability is not generally reachable through the supported public `engine/full` surface.
+
+The rule this establishes:
+
+```text
+IMPLEMENTED
++ ACCEPTED
++ INTENDED FOR EXTERNAL AUTHORING
+        |
+        v
+MUST HAVE A SUPPORTED PUBLIC ROUTE
+```
+
+Three clarifications, because this rule is easy to over-read:
+
+1. **Not everything internal should be exposed.** Engine-owned internal boundaries exist deliberately, and `CONSTITUTION.md` §5 requires that an ordinary exported game not ship the whole authoring toolchain.
+2. **A deep import is not a public API.** Reaching a capability by importing an internal module path is an unsupported workaround, not a supported route, and it silently freezes internal structure into the public contract.
+3. **The gap is a scheduling defect, not an architectural one.** The capabilities exist and are accepted; what is missing is the intentional decision about which of them are public and how.
+
+Reconciling the public surface is future work with its own bounded tranche. This section authorizes no export change.

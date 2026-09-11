@@ -676,7 +676,35 @@ If any applicable box cannot be checked, do not report unqualified PASS.
 
 ---
 
-## 28. Final Law
+## 28. Acceptance Direction for Expanded-Engine Systems
+
+### PRINCIPLE-LEVEL ONLY. NONE OF THESE SYSTEMS EXIST.
+
+`PRD.md` Part II records long-term product requirements. This section states, in advance, what "done" must mean for them, because each has an obvious shallow definition that is wrong.
+
+The pattern is always the same: **a system is not done because its most visible symptom appears.** It is done when the invariant underneath it holds.
+
+| System | NOT done merely because | Done requires |
+| --- | --- | --- |
+| Scene / composition | objects appear and can be nested | serialization round-trips to identical structural identity, transform authority is intact, prefab and instance relationships behave as specified, and persistent identity is real |
+| Asset importer | a file parses without throwing | it normalizes into engine-owned truth, no vendor type escapes the adapter, provenance is recorded, output is deterministic, and malformed input fails with a structured diagnostic |
+| Visual graph | nodes can be dragged and connected | the human door and the code door operate on the same data, produce the same behavior, and a test proves it; no editor-only state affects execution |
+| Streaming / residency | chunks disappear and reappear | identity, state and resource lifetime remain correct across unload and reload, and repeated cycling leaks nothing |
+| Save / persistence | state writes to disk and reads back | versioning and migration are defined, runtime handles are never serialized, and a save from an older version either loads or fails explicitly |
+| Networking | two clients connect and see each other | authority is enforced, replication converges, interest management is asserted by what is *not* sent, and disconnection, reconnection and restart have defined behavior |
+| Audio | a sound plays | lifecycle, mixing, spatialization and browser autoplay restrictions are handled, and resources are released |
+| Accessibility / localization | a settings panel exists | actions are genuinely rebindable and persist, locale switching does not disturb game state, and engine-owned public paths carry no hard-coded presentation strings |
+| Public API surface | the capability can be reached somehow | it is reachable through an intentional supported entry point, documented, and not by deep import (`PRD.md` §39) |
+| Performance optimization | a number improved | a baseline existed first, the measurement method is stated, and the change is justified against evidence rather than intuition |
+
+Two rules govern all of them, and both already exist in this document — they are repeated because expanded-engine work is where they are most likely to be quietly dropped:
+
+1. **Source semantics survive compilation.** An optimization that destroys authored identity is not done, it is a regression with better numbers (`ARCHITECTURE.md` §48.3).
+2. **Evidence, not inspection.** None of the above is satisfied by reading the code. `CONSTITUTION.md` §31 applies unchanged.
+
+---
+
+## 29. Final Law
 
 DONE means the machine earned the claim.
 
