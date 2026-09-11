@@ -31,7 +31,12 @@ const isControlled = params.has('controlled');
 
 const app = document.getElementById('app');
 
-if (params.get('game') === 'sequence') {
+if (params.has('preview')) {
+  // AI-ASSET-FOUNDATION-001: human-visible preview of a generated asset.
+  await import('./preview.css');
+  const { createPreviewViewer } = await import('./preview-viewer.js');
+  await createPreviewViewer(app, { asset: params.get('preview') || 'cinder' });
+} else if (params.get('game') === 'sequence') {
   const { createSequenceViewer } = await import('./sequence-viewer.js');
   createSequenceViewer(app, { controlled: isControlled });
 } else if (params.get('proof') === 'd') {

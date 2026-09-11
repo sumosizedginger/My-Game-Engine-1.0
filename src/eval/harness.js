@@ -59,7 +59,7 @@ async function isServerReady(url) {
 /**
  * Ensures server is reachable, spawning a local Vite server if not already active.
  */
-async function ensureServer(url) {
+export async function ensureServer(url) {
   if (await isServerReady(url)) {
     return { process: null };
   }
