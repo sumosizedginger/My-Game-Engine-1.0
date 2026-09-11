@@ -31,7 +31,16 @@ const isControlled = params.has('controlled');
 
 const app = document.getElementById('app');
 
-if (params.get('game') === 'sequence') {
+if (params.has('preview')) {
+  // AI-ASSET-FOUNDATION-001: human-visible preview of a generated asset.
+  await import('./preview.css');
+  const { createPreviewViewer, recreatePreviewViewer } = await import('./preview-viewer.js');
+  const previewAsset = params.get('preview') || 'cinder';
+  await createPreviewViewer(app, { asset: previewAsset });
+  // Exposed so lifecycle evidence can run repeated create/dispose cycles in one
+  // page, rather than relying on a reload that proves nothing about cleanup.
+  window.__PREVIEW_RECREATE__ = () => recreatePreviewViewer(app, { asset: previewAsset });
+} else if (params.get('game') === 'sequence') {
   const { createSequenceViewer } = await import('./sequence-viewer.js');
   createSequenceViewer(app, { controlled: isControlled });
 } else if (params.get('proof') === 'd') {
@@ -349,7 +358,7 @@ if (params.get('game') === 'sequence') {
     repository: CANONICAL_REPOSITORY,
     timestamp: new Date().toISOString(),
     canonicalToolchainTarget: {
-      node: '24.20.0',
+      node: '24.21.0',
       npm: '11.19.1',
       vite: '8.2.2'
     },

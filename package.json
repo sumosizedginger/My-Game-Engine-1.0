@@ -10,7 +10,7 @@
     "url": "https://github.com/sumosizedginger/My-Game-Engine-1.0.git"
   },
   "engines": {
-    "node": "24.20.0"
+    "node": "24.21.0"
   },
   "exports": {
     ".": "./src/index.js",
@@ -22,7 +22,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test tests/*.test.js",
-    "eval": "node src/eval/run.js"
+    "eval": "node src/eval/run.js",
+    "probe:cinder": "node src/eval/probe-cinder.js"
   },
   "devDependencies": {
     "puppeteer-core": "^25.10.0",

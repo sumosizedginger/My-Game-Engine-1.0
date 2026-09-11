@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-const APPROVED_NODE_VERSION = '24.20.0';
+const APPROVED_NODE_VERSION = '24.21.0';
 
 const REQUIRED_BOOTSTRAP_DOCS = [
   'README.md',

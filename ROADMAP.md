@@ -148,7 +148,7 @@ Phase 0 establishes only the minimum dependable machine required for later proof
 1. permanent documentation truth;
 2. canonical repository identity;
 3. Node/package/tooling baseline;
-4. Node `24.20.0` pin unless concrete incompatibility is demonstrated;
+4. Node `24.21.0` pin unless concrete incompatibility is demonstrated;
 5. minimal source/test/example/docs structure as actually needed;
 6. package scripts with stable build/test/run entry points;
 7. unit-test infrastructure;

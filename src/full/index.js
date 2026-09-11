@@ -5,16 +5,27 @@
  * This module is the entry point for authoring, Studio integration, and
  * games requiring runtime generation tooling.
  *
- * Conceptually: engine/full = engine/runtime + future compiler/Forge systems.
- * Approved future systems (Kiln, Geometry Forge, Character Forge, Motion Forge,
- * Material Forge, World Forge) will be integrated here as proofs earn them.
- * No premature placeholder stubs are fabricated in Phase 0.
+ * Conceptually: engine/full = engine/runtime + earned authoring systems.
+ * Systems are integrated here only as real consumers earn them; no premature
+ * placeholder stubs are fabricated.
+ *
+ * AI-ASSET-FOUNDATION-001 earned the authoring surface in ./authoring.js:
+ * MeshIR, its canonical codec, the initial modeling verbs, generic semantic
+ * anchors, Material Forge definitions, the Previewable contract, Preview Lab,
+ * the canonical view solver and AssetPreviewManifest.
+ *
+ * Deliberately still absent: Kiln, Geometry Forge room generation, Character
+ * Forge, Motion Forge and World Forge. They exist in the repository but no
+ * public consumer has earned them.
+ *
+ * Node-only evaluation machinery must never be re-exported from here.
  */
 
 import { createRuntime } from '../runtime/index.js';
 import { compileDefinition } from './compiler.js';
 
 export * from '../runtime/index.js';
+export * from './authoring.js';
 export { compileDefinition };
 
 export const ENTRY_POINT = 'engine/full';
