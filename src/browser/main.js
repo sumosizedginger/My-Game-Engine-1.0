@@ -3,6 +3,7 @@
  * Canonical repository: sumosizedginger/My-Game-Engine-1.0
  *
  * Supports:
+ * 0. Scene Composition (?scene=subterra)
  * 1. Proof B1 Motion Truth (?proof=b1)
  * 2. Proof A Pong Game (?game=pong)
  * 3. Phase 0 Minimal Boot Proof (default or ?proof=phase0)
@@ -31,7 +32,14 @@ const isControlled = params.has('controlled');
 
 const app = document.getElementById('app');
 
-if (params.has('preview')) {
+if (params.has('scene')) {
+  // SCENE-COMPOSITION-001: human-visible instantiated scene composition.
+  const { createSceneViewer, recreateSceneViewer } = await import('./scene-viewer.js');
+  const sceneKey = params.get('scene') || 'subterra';
+  createSceneViewer(app, { scene: sceneKey });
+  // Same-page recreation is the lifecycle a page reload cannot test.
+  window.__SCENE_RECREATE__ = () => recreateSceneViewer(app, { scene: sceneKey });
+} else if (params.has('preview')) {
   // AI-ASSET-FOUNDATION-001: human-visible preview of a generated asset.
   await import('./preview.css');
   const { createPreviewViewer, recreatePreviewViewer } = await import('./preview-viewer.js');

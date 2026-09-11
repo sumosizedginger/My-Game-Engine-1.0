@@ -35,7 +35,14 @@ const UNEARNED_SYSTEMS = [
 ];
 
 /** Everything engine/runtime must never expose. */
-const RUNTIME_FORBIDDEN = [...UNEARNED_SYSTEMS, 'compile', 'compileDefinition', 'createMesh', 'createBoxMesh', 'createPreviewable'];
+const RUNTIME_FORBIDDEN = [
+  ...UNEARNED_SYSTEMS,
+  'compile', 'compileDefinition', 'createMesh', 'createBoxMesh', 'createPreviewable',
+  // Scene AUTHORING and COMPILATION belong to engine/full. An exported game
+  // instantiates compiled scenes; it does not carry the scene compiler.
+  'compileScene', 'createSceneDefinition', 'createSceneNode',
+  'validateSceneDefinition', 'encodeScene', 'decodeScene'
+];
 
 /**
  * The complete authoring surface engine/full is permitted to add on top of the
@@ -70,7 +77,16 @@ const ALLOWED_FULL_ADDITIONS = new Set([
   'MANIFEST_VERSION', 'createAssetPreviewManifest', 'planCanonicalCaptures',
   'encodeManifest', 'manifestHash', 'structuralManifest', 'structuralManifestHash',
   // Discoverability.
-  'AUTHORING_SURFACE'
+  'AUTHORING_SURFACE',
+  // Scene composition authoring, earned by SCENE-COMPOSITION-001. The runtime
+  // half (instantiateScene, liveSceneInstanceCount) is a runtime export and is
+  // therefore not listed here.
+  'SCENE_DEFINITION_VERSION', 'SCENE_UNITS', 'SCENE_UP_AXIS', 'SCENE_FORWARD_AXIS',
+  'SCENE_MAX_NODES', 'IDENTITY_TRANSFORM', 'createLocalTransform',
+  'createSceneNode', 'createSceneDefinition',
+  'validateSceneDefinition', 'enforceValidSceneDefinition',
+  'SCENE_CODEC_VERSION', 'SCENE_CODEC_MAGIC', 'encodeScene', 'decodeScene', 'sceneHash',
+  'SCENE_ARTIFACT_VERSION', 'compileScene', 'composeTransforms'
 ]);
 
 /**
@@ -86,7 +102,16 @@ const RENDERER_INDEPENDENT_MODULES = [
   'src/geometry/mesh.js',
   'src/geometry/mesh-ops.js',
   'src/geometry/mesh-codec.js',
-  'src/geometry/anchors.js'
+  'src/geometry/anchors.js',
+  // SCENE-COMPOSITION-001: a scene is engine data, never a renderer scene
+  // graph. If any of these ever import Three.js, the claim that rendering
+  // CONSUMES a scene rather than owning one has quietly become false.
+  'src/scene/definition.js',
+  'src/scene/validation.js',
+  'src/scene/codec.js',
+  'src/scene/compiler.js',
+  'src/scene/instance.js',
+  'src/scene/index.js'
 ];
 
 /** Node-only specifiers that must never be reachable from engine/full. */

@@ -1429,11 +1429,17 @@ If a simpler design survives the same proofs and preserves the Constitution, pre
 
 ## 43. Scene and Composition Architecture
 
-### APPROVED FUTURE SYSTEM — NOT IMPLEMENTED
+### FOUNDATION BUILT — AWAITING VALIDATION
 
-A repository audit identified this as the largest structural gap between the current engine and a general-purpose engine. There is presently no engine-owned scene or composition model. Each proof assembles its own renderer scene independently, which is correct for a bounded proof and insufficient for a general engine.
+SCENE-COMPOSITION-001 implemented the foundation. It has **not** been independently validated or human-accepted, and must not be described as ACCEPTED until it is.
 
-Seven accepted future requirements depend on this model existing first: prefabs and instancing, save and persistence, story and quest references to world objects, Studio inspection, world streaming, networking, and MMO persistence. It is therefore a keystone rather than one feature among many.
+**What now exists.** `SceneDefinition` (source) compiles to a frozen `SceneArtifact` and instantiates into a `SceneInstance`: persistent authored identity, hierarchy, local transforms, derived world composition, deterministic canonical serialization, immutable artifact identity, runtime entity mapping, clean unload and reload, independent instances, structured diagnostics, and a supported public API split across `engine/runtime` and `engine/full`. Its forcing consumer is the SUBTERRA cell, a 37-node constructed environment. The subsystem specification is `docs/spec/scene.md`.
+
+**What remains future**, and is deliberately absent: prefabs, reparenting, scene transitions, streaming and chunking, save-game persistence, networking, live hierarchy mutation after compilation, and spatial indexing. See `docs/spec/scene.md` §11.
+
+The gap this closed was real. There was previously no engine-owned scene or composition model at all: each proof assembled its own renderer scene independently, which was correct for a bounded proof and insufficient for a general engine.
+
+Seven accepted future requirements depend on this model existing first: prefabs and instancing, save and persistence, story and quest references to world objects, Studio inspection, world streaming, networking, and MMO persistence. It is therefore a keystone rather than one feature among many, and the foundation was built first for that reason.
 
 ### 43.1 Concepts the model must eventually carry
 
@@ -1458,9 +1464,17 @@ world state
 - **Transform authority is unchanged.** §9 and `CONSTITUTION.md` §13 continue to govern who may write a transform. A hierarchy does not create a second writer.
 - **Composition does not own rendering.** What exists in a scene and what is submitted to the GPU are separate questions (§48).
 
-### 43.3 What must not be done yet
+### 43.3 Implementation notes that became architecture
 
-Do not specify the scene API before a forcing consumer earns it. A constructed playable environment is the natural first consumer; a renderer demonstration is not. Over-specifying this model before a real game pulls on it is precisely the failure `CONSTITUTION.md` §32 exists to prevent.
+Two findings from SCENE-COMPOSITION-001 are durable enough to record here rather than only in the subsystem specification.
+
+**`ATTACHED` was already the right mechanism.** `GAMEPLAY_FOUNDATION.md` §3.1 defines `TRANSFORM_OWNERSHIP.ATTACHED` as "derives world transform hierarchically from a parent entity". It existed and was unused. Scene composition uses it for parented nodes and `STATIC` for roots, so hierarchy introduced no new ownership mode and no second per-tick transform writer. The scene publishes derived world *position* into the existing transform manager once, at instantiation.
+
+**Rotation and scale stayed out of the runtime transform.** The runtime `Transform` record owns position and velocity. Scene composition did not extend it; full placement is read from derived artifact data instead. Extending the runtime transform is transform-architecture work and needs its own authorization.
+
+### 43.4 What must not be done yet
+
+Do not widen the scene API before a forcing consumer earns it. Over-specifying this model before a real game pulls on it is precisely the failure `CONSTITUTION.md` §32 exists to prevent, and the boundaries in `docs/spec/scene.md` §11 are deliberate rather than incidental.
 
 ---
 

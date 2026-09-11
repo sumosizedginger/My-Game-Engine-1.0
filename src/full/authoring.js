@@ -109,12 +109,50 @@ export {
   structuralManifestHash
 } from '../preview/manifest.js';
 
+// Scene composition (SCENE-COMPOSITION-001): authoring, validation,
+// serialization and compilation. The RUNTIME half - instantiateScene - is
+// exported from engine/runtime, so an exported game carries the instantiator
+// without the compiler. See CONSTITUTION.md §5 and docs/spec/scene.md.
+export {
+  SCENE_DEFINITION_VERSION,
+  SCENE_UNITS,
+  SCENE_UP_AXIS,
+  SCENE_FORWARD_AXIS,
+  SCENE_MAX_NODES,
+  IDENTITY_TRANSFORM,
+  createLocalTransform,
+  createSceneNode,
+  createSceneDefinition
+} from '../scene/definition.js';
+
+export {
+  validateSceneDefinition,
+  enforceValidSceneDefinition
+} from '../scene/validation.js';
+
+export {
+  SCENE_CODEC_VERSION,
+  SCENE_CODEC_MAGIC,
+  encodeScene,
+  decodeScene,
+  sceneHash
+} from '../scene/codec.js';
+
+export {
+  SCENE_ARTIFACT_VERSION,
+  compileScene,
+  composeTransforms
+} from '../scene/compiler.js';
+
 import { MESH_OP_DESCRIPTORS } from '../geometry/mesh-ops.js';
 import { MESH_IR_VERSION as IR_VERSION, ATTRIBUTE_ITEM_SIZE } from '../geometry/mesh.js';
 import { MESH_CODEC_VERSION as CODEC_VERSION } from '../geometry/mesh-codec.js';
 import { CANONICAL_VIEWS as VIEWS } from '../preview/views.js';
 import { PREVIEW_BUDGET_DEFAULTS as BUDGET } from '../preview/budget.js';
 import { MANIFEST_VERSION as MANIFEST_V } from '../preview/manifest.js';
+import { SCENE_DEFINITION_VERSION as SCENE_V } from '../scene/definition.js';
+import { SCENE_CODEC_VERSION as SCENE_CODEC_V } from '../scene/codec.js';
+import { SCENE_ARTIFACT_VERSION as SCENE_ARTIFACT_V } from '../scene/compiler.js';
 
 /**
  * Machine-readable description of the public authoring capabilities.
@@ -142,7 +180,10 @@ export const AUTHORING_SURFACE = Object.freeze({
   versions: Object.freeze({
     meshIr: IR_VERSION,
     meshCodec: CODEC_VERSION,
-    manifest: MANIFEST_V
+    manifest: MANIFEST_V,
+    sceneDefinition: SCENE_V,
+    sceneCodec: SCENE_CODEC_V,
+    sceneArtifact: SCENE_ARTIFACT_V
   }),
   operations: MESH_OP_DESCRIPTORS,
   preview: Object.freeze({
@@ -161,11 +202,25 @@ export const AUTHORING_SURFACE = Object.freeze({
       reason: 'Node-only evaluation tooling; depends on puppeteer-core and node:fs. The shared contract is solveCanonicalView.'
     })
   ]),
+  scene: Object.freeze({
+    tranche: 'SCENE-COMPOSITION-001',
+    pipeline: 'SceneDefinition -> compileScene -> SceneArtifact -> instantiateScene',
+    // A scene holds no geometry. Nodes carry an opaque `asset` key that a
+    // presentation layer resolves, which is what keeps the definition
+    // renderer-independent and serializable.
+    holdsGeometry: false,
+    serializesRuntimeHandles: false,
+    runtimeEntryPoint: 'engine/runtime: instantiateScene',
+    transformOwnership: Object.freeze({ root: 'STATIC', child: 'ATTACHED' })
+  }),
   laws: Object.freeze([
     'Every asset part requires a semanticName. Anonymous parts are refused.',
     'Operations are pure: inputs are never mutated.',
     'Merge never silently drops an input.',
     'The preview budget fails closed.',
-    'Topology-aware operations (bevel, boolean, subdivision, remesh) are not available in this tranche.'
+    'Topology-aware operations (bevel, boolean, subdivision, remesh) are not available in this tranche.',
+    'A scene is engine data, never a renderer scene graph. It holds no geometry.',
+    'Scene persistent ids belong to the source. Runtime entity handles are never serialized.',
+    'Scene hierarchy is a forest: duplicate ids, missing parents, self-parents and cycles are refused.'
   ])
 });
