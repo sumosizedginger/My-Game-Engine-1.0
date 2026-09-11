@@ -14,6 +14,8 @@ import {
   planCanonicalCaptures,
   encodeManifest,
   manifestHash,
+  structuralManifest,
+  structuralManifestHash,
   encodeMesh,
   CANONICAL_VIEWS
 } from '../full/index.js';
@@ -161,6 +163,11 @@ export async function createPreviewViewer(root, { asset = 'cinder' } = {}) {
     manifest,
     manifestJson: encodeManifest(manifest),
     manifestHash: manifestHash(manifest),
+    // PORTABLE asset identity. The full manifest carries the observation —
+    // camera pose, aspect, viewport — all of which move with the browser
+    // window. Only this hash is comparable across machines and window sizes.
+    structuralJson: encodeManifest(structuralManifest(manifest)),
+    structuralHash: structuralManifestHash(manifest),
     meshHash: previewable.source.meshHash,
     views: CANONICAL_VIEWS,
 
@@ -176,6 +183,13 @@ export async function createPreviewViewer(root, { asset = 'cinder' } = {}) {
 
     getStats: () => lab.getStats(),
     getParts: () => lab.getParts(),
+    getLighting: () => lab.getLighting(),
+
+    /** Lights currently in the scene. Re-aiming the rig must not grow this. */
+    get lightCount() {
+      return lab.lightCount;
+    },
+
     getDiagnostics: () => [...previewable.diagnostics, ...lab.getDiagnostics()],
 
     /** Live Preview Lab instances. Must return to zero after dispose. */

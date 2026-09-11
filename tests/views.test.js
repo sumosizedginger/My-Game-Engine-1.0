@@ -7,6 +7,14 @@ import {
   CANONICAL_VIEW_DIRECTIONS,
   CANONICAL_VIEW_UP,
   DEFAULT_VIEW_OPTIONS,
+  DEFAULT_UP_AXIS,
+  DEFAULT_FORWARD_AXIS,
+  AXIS_VECTORS,
+  semanticFrame,
+  resolveCanonicalViewDirections,
+  resolveCanonicalViewUps,
+  INSPECTION_RIG,
+  inspectionLightFrame,
   solveCanonicalView,
   solveAllCanonicalViews,
   boundingRadius,
@@ -14,7 +22,7 @@ import {
   projectBounds,
   boundsCorners
 } from '../src/preview/views.js';
-import { createBounds } from '../src/geometry/mesh.js';
+import { createBounds, MESH_UP_AXIS, MESH_FORWARD_AXIS } from '../src/geometry/mesh.js';
 
 const UNIT_BOUNDS = createBounds([-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]);
 
@@ -249,4 +257,182 @@ test('Preview Lab and the capture driver both resolve framing through this solve
   const capture = fs.readFileSync(new URL('../src/eval/canonical-capture.js', import.meta.url), 'utf8');
   assert.match(lab, /from '\.\/views\.js'/);
   assert.match(capture, /from '\.\.\/preview\/views\.js'/);
+});
+
+// ---------------------------------------------------------------------------
+// ASSET-RELATIVE CANONICAL VIEWS
+//
+// These view names used to be world-space constants, with `front` pinned to
+// +Z. The engine declares `forwardAxis: '-Z'`, so the capture labelled `front`
+// observed the asset's REAR. A manifest that states one forward axis while
+// labelling the opposite observation "front" is false evidence.
+// ---------------------------------------------------------------------------
+
+const dot3 = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross3 = (a, b) => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0]
+];
+
+/** Valid up/forward pairs spanning several distinct orientations. */
+const ORIENTATIONS = [
+  { upAxis: '+Y', forwardAxis: '-Z' },
+  { upAxis: '+Y', forwardAxis: '+Z' },
+  { upAxis: '+Z', forwardAxis: '+X' },
+  { upAxis: '+Z', forwardAxis: '-Y' },
+  { upAxis: '-Y', forwardAxis: '+X' },
+  { upAxis: '+X', forwardAxis: '+Y' }
+];
+
+test('view solver defaults match the MeshIR axis conventions', () => {
+  // views.js keeps zero imports on purpose, so the constants are duplicated.
+  // This is the tripwire that stops them drifting apart.
+  assert.equal(DEFAULT_UP_AXIS, MESH_UP_AXIS);
+  assert.equal(DEFAULT_FORWARD_AXIS, MESH_FORWARD_AXIS);
+  assert.equal(DEFAULT_VIEW_OPTIONS.upAxis, MESH_UP_AXIS);
+  assert.equal(DEFAULT_VIEW_OPTIONS.forwardAxis, MESH_FORWARD_AXIS);
+});
+
+test('front looks at the face the asset declares it faces', () => {
+  for (const { upAxis, forwardAxis } of ORIENTATIONS) {
+    const dirs = resolveCanonicalViewDirections(upAxis, forwardAxis);
+    assert.deepEqual([...dirs.front], [...AXIS_VECTORS[forwardAxis]],
+      `${upAxis}/${forwardAxis}: the front camera must sit on the asset's forward side`);
+  }
+});
+
+test('front and back are exactly opposed for every orientation', () => {
+  for (const { upAxis, forwardAxis } of ORIENTATIONS) {
+    const dirs = resolveCanonicalViewDirections(upAxis, forwardAxis);
+    assert.equal(dot3(dirs.front, dirs.back), -1,
+      `${upAxis}/${forwardAxis}: front and back must be opposite`);
+    assert.equal(dot3(dirs.left, dirs.right), -1,
+      `${upAxis}/${forwardAxis}: left and right must be opposite`);
+  }
+});
+
+test('left and right follow right-handed asset handedness', () => {
+  for (const { upAxis, forwardAxis } of ORIENTATIONS) {
+    const dirs = resolveCanonicalViewDirections(upAxis, forwardAxis);
+    const frame = semanticFrame(upAxis, forwardAxis);
+    // right = forward x up is the convention the engine already declares: an
+    // asset facing -Z with +Y up has its own right along +X.
+    assert.deepEqual(frame.right, cross3(AXIS_VECTORS[forwardAxis], AXIS_VECTORS[upAxis]));
+    assert.deepEqual([...dirs.right], frame.right);
+    assert.deepEqual([...dirs.left], frame.right.map((n) => -n));
+    assert.equal(dot3(frame.forward, frame.up), 0);
+    assert.equal(dot3(frame.forward, frame.right), 0);
+    assert.equal(dot3(frame.up, frame.right), 0);
+  }
+});
+
+test('top looks down the declared up axis, and its up hint is the forward axis', () => {
+  for (const { upAxis, forwardAxis } of ORIENTATIONS) {
+    const dirs = resolveCanonicalViewDirections(upAxis, forwardAxis);
+    const ups = resolveCanonicalViewUps(upAxis, forwardAxis);
+    assert.deepEqual([...dirs.top], [...AXIS_VECTORS[upAxis]]);
+    // The asset's up cannot also be the top view's up hint: the basis would
+    // degenerate. Forward is used, so a plan view points the asset upward.
+    assert.deepEqual([...ups.top], [...AXIS_VECTORS[forwardAxis]]);
+    assert.equal(dot3(ups.top, dirs.top), 0, 'top up hint must be perpendicular to the view direction');
+  }
+});
+
+test('threeQuarter is derived from the same semantic basis, not a world constant', () => {
+  for (const { upAxis, forwardAxis } of ORIENTATIONS) {
+    const dirs = resolveCanonicalViewDirections(upAxis, forwardAxis);
+    const frame = semanticFrame(upAxis, forwardAxis);
+    const expected = [0, 1, 2].map((i) =>
+      (frame.forward[i] + frame.right[i] + frame.up[i]) / Math.sqrt(3));
+    for (let i = 0; i < 3; i++) {
+      assert.ok(Math.abs(dirs.threeQuarter[i] - expected[i]) < 1e-12,
+        `${upAxis}/${forwardAxis}: threeQuarter must be forward+right+up normalised`);
+    }
+    assert.ok(dot3(dirs.threeQuarter, frame.forward) > 0.5,
+      'threeQuarter must be a FRONT three-quarter');
+  }
+});
+
+test('every canonical view basis stays orthonormal for every orientation', () => {
+  for (const { upAxis, forwardAxis } of ORIENTATIONS) {
+    for (const view of CANONICAL_VIEWS) {
+      const { xAxis, yAxis, zAxis } = viewBasis(view, { upAxis, forwardAxis });
+      for (const axis of [xAxis, yAxis, zAxis]) {
+        assert.ok(Math.abs(Math.hypot(...axis) - 1) < 1e-12, `${view} basis axis not unit`);
+      }
+      assert.ok(Math.abs(dot3(xAxis, yAxis)) < 1e-12);
+      assert.ok(Math.abs(dot3(yAxis, zAxis)) < 1e-12);
+      assert.ok(Math.abs(dot3(xAxis, zAxis)) < 1e-12);
+    }
+  }
+});
+
+test('an up axis parallel to the forward axis is refused', () => {
+  assert.throws(() => semanticFrame('+Y', '+Y'), /parallel/);
+  assert.throws(() => semanticFrame('+Y', '-Y'), /parallel/);
+  assert.throws(() => semanticFrame('+Q', '-Z'), /Unknown upAxis/);
+  assert.throws(() => semanticFrame('+Y', 'forward'), /Unknown forwardAxis/);
+});
+
+test('the solved camera carries the axes it was resolved against', () => {
+  const camera = solveCanonicalView('front', UNIT_BOUNDS, { upAxis: '+Z', forwardAxis: '+X' });
+  assert.equal(camera.upAxis, '+Z');
+  assert.equal(camera.forwardAxis, '+X');
+  // Camera sits on the +X side, because that is where the asset faces.
+  assert.ok(camera.position[0] > 0);
+  assert.ok(Math.abs(camera.position[1]) < 1e-12);
+});
+
+test('the inspection rig is camera-relative, so every view is lit comparably', () => {
+  // The defect: fixed world lights meant a view facing the key returned bright
+  // evidence and a view facing away returned dark evidence, for one asset.
+  const perView = CANONICAL_VIEWS.map((view) => {
+    const camera = solveCanonicalView(view, UNIT_BOUNDS, { aspect: 1 });
+    const frame = inspectionLightFrame(camera);
+    const toCamera = [
+      camera.position[0] - camera.target[0],
+      camera.position[1] - camera.target[1],
+      camera.position[2] - camera.target[2]
+    ];
+    const length = Math.hypot(...toCamera);
+    const unitToCamera = toCamera.map((n) => n / length);
+    const key = frame.lights.find((l) => l.name === 'key');
+    return { view, version: frame.version, keyTowardCamera: dot3(key.direction, unitToCamera) };
+  });
+
+  for (const entry of perView) {
+    assert.equal(entry.version, INSPECTION_RIG.version);
+    // The key sits on the camera side for EVERY view, by the same amount. That
+    // constancy is what makes canonical captures comparable as evidence.
+    assert.ok(Math.abs(entry.keyTowardCamera - perView[0].keyTowardCamera) < 1e-9,
+      `${entry.view}: key/camera relationship must not vary between canonical views`);
+    assert.ok(entry.keyTowardCamera > 0.4, `${entry.view}: key must be on the camera side`);
+  }
+});
+
+test('inspection rig directions are unit length and deterministic', () => {
+  const camera = solveCanonicalView('threeQuarter', UNIT_BOUNDS, { aspect: 16 / 9 });
+  const a = inspectionLightFrame(camera);
+  const b = inspectionLightFrame(camera);
+  assert.deepEqual(a, b);
+  assert.equal(a.lights.length, INSPECTION_RIG.lights.length);
+  for (const light of a.lights) {
+    assert.ok(Math.abs(Math.hypot(...light.direction) - 1) < 1e-12, `${light.name} direction must be unit`);
+    assert.ok(Number.isFinite(light.intensity) && light.intensity > 0);
+  }
+});
+
+test('CINDER front observes the muzzle and back observes the stock', () => {
+  // The concrete acceptance the audit named. CINDER declares forwardAxis -Z and
+  // its muzzle sits at the most negative Z, so the `front` camera must be on
+  // the negative-Z side of the asset.
+  const bounds = createBounds([-0.052, -0.274, -0.509], [0.052, 0.146, 0.558]);
+  const options = { aspect: 1.5, upAxis: '+Y', forwardAxis: '-Z' };
+  const front = solveCanonicalView('front', bounds, options);
+  const back = solveCanonicalView('back', bounds, options);
+
+  assert.ok(front.position[2] < bounds.center[2], 'front camera must sit forward of the asset (-Z)');
+  assert.ok(back.position[2] > bounds.center[2], 'back camera must sit behind the asset (+Z)');
+  assert.ok(front.position[2] < back.position[2]);
 });

@@ -132,7 +132,13 @@ export function createAssetPreviewManifest(previewable, { captures = [], perform
  * @returns {Array<object>} Camera records.
  */
 export function planCanonicalCaptures(previewable, viewOptions = {}) {
-  return solveAllCanonicalViews(previewable.bounds, viewOptions);
+  // Views are resolved against the ASSET'S declared axes, not against world
+  // constants, so `front` observes the face the asset says it faces.
+  return solveAllCanonicalViews(previewable.bounds, {
+    upAxis: previewable.mesh.upAxis,
+    forwardAxis: previewable.mesh.forwardAxis,
+    ...viewOptions
+  });
 }
 
 /**
@@ -159,19 +165,55 @@ export function manifestHash(manifest) {
 }
 
 /**
- * Returns the manifest with volatile capture environment fields removed.
+ * Reduces a manifest to PORTABLE ASSET IDENTITY.
  *
- * Manifest determinism is asserted over the structural content. Environment
- * metadata (browser build, renderer backend) and image hashes are evidence
- * ABOUT a capture, not part of the asset's identity, and legitimately differ
- * between machines.
+ * ---------------------------------------------------------------------------
+ * The contract this repairs
+ * ---------------------------------------------------------------------------
+ * This function previously stripped only `environment`, `imageHash` and
+ * `imagePath` from each capture, and kept the camera pose, aspect, viewport and
+ * projectedBoundsOccupancy. Every one of those is a function of the LIVE
+ * PREVIEW SURFACE: the solver fits the camera to the viewport aspect, so
+ * resizing a browser window moves the camera, which changed the "structural"
+ * bytes and hash.
+ *
+ * The observed consequence, from this branch's own evidence: identical MeshIR
+ * `1f3c73aa330cbe18` produced manifest hash `4aad7de3ff23fee9` at a 960x640
+ * viewport and `2913d0deddc1406e` at 1680x1180. Same asset, same source, same
+ * bytes of geometry — different "identity".
+ *
+ * A UI viewport is not asset identity. Captures are an OBSERVATION OF an asset
+ * and are removed here in full, along with measured `performance`, which is
+ * machine speed rather than asset content.
+ *
+ * What remains is portable: source identity, scene units and axes, bounds,
+ * geometry statistics, semantic parts, anchors, materials and structural
+ * diagnostics. Those are identical for the same asset on any machine at any
+ * window size.
+ *
+ * The single AssetPreviewManifest type is kept — the repository architecture
+ * favours it — so this is the explicit exclusion the contract requires rather
+ * than a second manifest type. `manifestHash` is NOT redefined: it still hashes
+ * whatever manifest it is given. Portable identity is `structuralManifestHash`.
  *
  * @param {object} manifest
- * @returns {object}
+ * @returns {object} Manifest without capture-dependent fields.
  */
 export function structuralManifest(manifest) {
-  return {
-    ...manifest,
-    captures: manifest.captures.map(({ environment, imageHash, imagePath, ...rest }) => rest)
-  };
+  const { captures, performance, ...structural } = manifest;
+  return structural;
+}
+
+/**
+ * Hashes the PORTABLE structural identity of an asset.
+ *
+ * This is the hash that must be equal for the same asset across machines,
+ * browsers, window sizes and aspect ratios. Compare assets with this; compare
+ * observations with `manifestHash`.
+ *
+ * @param {object} manifest
+ * @returns {string} Hex fingerprint.
+ */
+export function structuralManifestHash(manifest) {
+  return manifestHash(structuralManifest(manifest));
 }

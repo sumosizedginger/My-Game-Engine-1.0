@@ -7,7 +7,8 @@ import {
   planCanonicalCaptures,
   encodeManifest,
   manifestHash,
-  structuralManifest
+  structuralManifest,
+  structuralManifestHash
 } from '../src/preview/manifest.js';
 import { createPreviewable } from '../src/preview/previewable.js';
 import { createBoxMesh, createCylinderMesh, mergeMeshIR, transformMesh } from '../src/geometry/mesh-ops.js';
@@ -135,25 +136,94 @@ test('performance is omitted when nothing was measured, never fabricated', () =>
   p.dispose();
 });
 
-test('structuralManifest strips volatile capture environment for cross-machine comparison', () => {
+/**
+ * Builds a manifest for one previewable at a given viewport, the way the
+ * browser route does: captures planned from the MEASURED surface aspect.
+ *
+ * @param {number} width
+ * @param {number} height
+ * @returns {object}
+ */
+function manifestAtViewport(width, height) {
   const p = build();
-  const captures = planCanonicalCaptures(p).map((c) => ({
+  const captures = planCanonicalCaptures(p, { aspect: width / height }).map((c) => ({
     name: c.name,
     cameraPosition: c.position,
     cameraTarget: c.target,
     up: c.up,
     fovDeg: c.fovDeg,
-    viewport: { width: 960, height: 640 },
-    environment: { rendererBackend: 'vendor-specific', dpr: 2 },
-    imageHash: 'aaaa'
+    aspect: c.aspect,
+    projectedBoundsOccupancy: c.projectedBoundsOccupancy,
+    viewport: { width, height },
+    environment: { rendererBackend: 'vendor-specific', dpr: width > 1000 ? 2 : 1 },
+    imagePath: `x/${c.name}.png`,
+    imageHash: `hash-${width}`
   }));
-  const m = createAssetPreviewManifest(p, { captures });
-  const s = structuralManifest(m);
-  assert.equal(s.captures[0].environment, undefined);
-  assert.equal(s.captures[0].imageHash, undefined);
-  // Camera pose survives: it is asset identity, not machine identity.
-  assert.deepEqual(s.captures[0].cameraPosition, m.captures[0].cameraPosition);
+  const manifest = createAssetPreviewManifest(p, { captures });
   p.dispose();
+  return manifest;
+}
+
+test('portable structural identity is independent of viewport and aspect', () => {
+  // THE CONTRACT THIS TRANCHE REPAIRS.
+  //
+  // The camera solve fits the asset to the viewport aspect, so camera pose,
+  // aspect, viewport and projectedBoundsOccupancy all move when a browser
+  // window is resized. They previously survived into the "structural" manifest,
+  // which meant the same asset from the same source produced a different
+  // structural hash at a different window size. A UI viewport is not asset
+  // identity.
+  const wide = manifestAtViewport(1680, 1180);
+  const standard = manifestAtViewport(960, 640);
+  const tall = manifestAtViewport(540, 1260);
+
+  const bytes = [wide, standard, tall].map((m) => encodeManifest(structuralManifest(m)));
+  assert.equal(bytes[0], bytes[1], 'structural bytes must not depend on viewport');
+  assert.equal(bytes[1], bytes[2], 'structural bytes must not depend on aspect');
+
+  const hashes = [wide, standard, tall].map((m) => structuralManifestHash(m));
+  assert.equal(new Set(hashes).size, 1, `structural hash differed across viewports: ${hashes.join(', ')}`);
+});
+
+test('the observation manifest legitimately differs by viewport without changing asset identity', () => {
+  const standard = manifestAtViewport(960, 640);
+  const tall = manifestAtViewport(540, 1260);
+
+  // The observation genuinely differs...
+  assert.notEqual(manifestHash(standard), manifestHash(tall));
+  const sideA = standard.captures.find((c) => c.name === 'right');
+  const sideB = tall.captures.find((c) => c.name === 'right');
+  assert.notDeepEqual(sideA.cameraPosition, sideB.cameraPosition,
+    'a narrow viewport must pull the camera back for a wide asset');
+  assert.notDeepEqual(sideA.viewport, sideB.viewport);
+  assert.notEqual(sideA.aspect, sideB.aspect);
+
+  // ...while the asset is the same asset.
+  assert.equal(structuralManifestHash(standard), structuralManifestHash(tall));
+});
+
+test('structuralManifest excludes every capture-dependent field', () => {
+  const m = manifestAtViewport(960, 640);
+  const s = structuralManifest(m);
+
+  assert.equal('captures' in s, false, 'captures are an observation, not identity');
+  assert.equal('performance' in s, false, 'measured timings are machine speed, not identity');
+
+  // What remains is portable asset evidence.
+  for (const field of ['manifestVersion', 'source', 'scene', 'bounds', 'geometry', 'parts', 'anchors', 'materials', 'diagnostics']) {
+    assert.ok(field in s, `structural manifest must retain ${field}`);
+  }
+  // And it is not hollowed out: part-level measurement is the point.
+  assert.ok(s.parts.length > 0);
+  assert.ok(s.parts[0].bounds.dimensions.some((d) => d > 0));
+});
+
+test('manifestHash is not redefined: it hashes whatever manifest it is given', () => {
+  const m = manifestAtViewport(960, 640);
+  assert.equal(manifestHash(m), manifestHash(m));
+  assert.notEqual(manifestHash(m), structuralManifestHash(m),
+    'the full observation and the portable identity are different hashes');
+  assert.equal(structuralManifestHash(m), manifestHash(structuralManifest(m)));
 });
 
 test('diagnostics are carried into the manifest', () => {

@@ -6,9 +6,22 @@
 
 **Branch:** `ai-asset-foundation-001`
 
-**Asset revision:** `d07589efa94cd23aafc578b57de6cafd5da0bc1e` (worktree clean)
+**Revisions.** Two SHAs appear in this document and they are not
+interchangeable:
+
+| SHA | What it is |
+| --- | --- |
+| `d07589e` | The **asset-source implementation revision** — the commit that contains the CINDER MK-I source this benchmark measures. The capture evidence in §3 was generated against it with a clean worktree. |
+| `0c04b69` | The **branch head at which this benchmark document was first written**, i.e. the evidence/document revision. It adds this file and changes no asset source. |
 
 **Toolchain:** Node `v24.21.0`
+
+> **Evidence-contract repairs landed after `0c04b69`.** An independent re-audit
+> found three defects in the harness this benchmark ran on — structural
+> manifest identity depending on the live viewport, canonical `front`/`back`
+> disagreeing with the declared asset axes, and view-biased fixed lighting.
+> They are repaired, and §6 D1/D2 and §9 record their resolution. The CINDER
+> geometry is unchanged by those repairs.
 
 ---
 
@@ -79,6 +92,28 @@ of budget while geometry is at 2.9%. The ceiling on authored complexity in this
 architecture today is *the per-part draw call*, not triangles, not vertices and
 not generation time. That points at compilation work, not modelling work.
 
+### Three kinds of part identity, which this benchmark showed are conflated
+
+The finding above is easy to state wrongly. Precisely:
+
+| Identity | What it is | Who needs it |
+| --- | --- | --- |
+| **Authoring / evidence part identity** | A named, measurable region of the MeshIR: `rail.tooth.04`, with its own bounds and triangle count in the manifest | The authoring agent and the human reviewer |
+| **Gameplay object identity** | A thing the game can detach, damage, hide or attach to | The runtime and the game code |
+| **Runtime render-group identity** | A submission the GPU is asked to draw | The renderer |
+
+These are three different questions and **nothing requires them to be the same
+answer.** A decorative rivet plainly needs authoring identity — an agent must be
+able to measure and revise it — and plainly does not need to be a gameplay
+object or its own draw submission.
+
+The actual measured finding is narrower and mechanical: **`src/render/mesh-adapter.js`
+emits one geometry group per MeshIR part**, so today authoring granularity
+*forces* render-group granularity, and `drawCalls === parts.length` by
+construction. That coupling — not any claim about what a rail tooth deserves —
+is the earned reason a future Kiln pass should compile authored parts into
+render groups independently of how many names the author gave them.
+
 ### Parts by assembly
 
 | Assembly | Parts | Assembly | Parts |
@@ -93,17 +128,21 @@ not generation time. That points at compilation work, not modelling work.
 
 ### What was consolidated, and what stayed separate
 
-Kept separate because a consumer needs the identity: every rail tooth, vent,
-rib, prong, fastener and status indicator. A game needs to detach an optic,
-damage a magazine, or light a status chip independently.
+Kept separate because a consumer needs the **authoring and evidence** identity:
+every rail tooth, vent, rib, prong, fastener and status indicator is
+individually named and individually measured in the manifest, which is what
+lets an agent revise one of them. Some of them — the optic, the magazine, the
+status chips — also want gameplay identity. Almost none of them needs to be its
+own draw submission; that they currently are is the adapter coupling described
+above, not a requirement.
 
 Consolidated: the barrel is one cylinder rather than a stack of sections; the
 receiver core is one prism per half rather than per panel; the stock trusses
 are three parts rather than three parts plus joint blocks.
 
 Not consolidated further **because part count is the binding budget** — which is
-the same finding from the other direction. Given batching, the natural next
-step would be more parts, not fewer.
+the same finding from the other direction. Given render-group compilation, the
+natural next step is more authored parts, not fewer.
 
 ---
 
@@ -278,21 +317,49 @@ reads as 22 flat strips.
 
 ### D — Preview and evidence limitations
 
-**D1. Canonical view names disagree with the declared forward axis.**
-`CANONICAL_VIEW_DIRECTIONS.front` is `[0, 0, 1]`, a world-space label, while the
-engine declares `forwardAxis: '-Z'`. The consequence is that **CINDER's `front`
-capture shows its butt plate and its `back` capture shows its muzzle.** An agent
-reasoning over a manifest that says `forwardAxis: -Z` and a capture named
-`front` will draw the wrong conclusion. Either the views should be resolved
-relative to the declared axes, or the names should be world-relative
-(`plusZ`/`minusZ`) so they cannot be misread.
+**D1. Canonical view names disagreed with the declared forward axis. REPAIRED.**
+`CANONICAL_VIEW_DIRECTIONS.front` was `[0, 0, 1]`, a world-space label, while
+the engine declares `forwardAxis: '-Z'`. CINDER's `front` capture therefore
+showed its butt plate and its `back` capture showed its muzzle — false
+evidence, and an agent reading it would reconstruct a backwards asset.
 
-**D2. Three of six canonical views are effectively backlit.** The key light is
-fixed at `(3, 5, 4)`, so `front`, `back` and `left` are lit only by the 0.8
-fill and return markedly darker evidence than `right` and `threeQuarter`. This
-is an asset-independent property of the harness: half the canonical evidence is
-systematically less legible than the other half, and an agent has no way to
-know that from the manifest.
+Canonical views are now resolved from the asset's own declared axes
+(`resolveCanonicalViewDirections`), so `front` observes the face the asset says
+it faces, `back` is exactly opposed, `left`/`right` follow right-handed asset
+handedness, `top` follows the declared up, and `threeQuarter` is derived from
+the same basis and is now a genuine FRONT three-quarter. No world-relative
+aliases were added: nothing needs them.
+
+**D2. Three of six canonical views were effectively backlit. REPAIRED.** The key
+light was fixed in world space at `(3, 5, 4)`, so `front`, `back` and `left`
+were lit only by the 0.8 fill and returned markedly darker evidence than
+`right` and `threeQuarter`, for the same asset. Half the canonical evidence was
+systematically less legible than the other half and nothing in the manifest
+said so.
+
+Inspection lighting is now a versioned, camera-relative studio rig
+(`INSPECTION_RIG`, `inspectionLightFrame`) re-aimed per canonical view, and the
+resolved directions are recorded in each capture record. Image-based lighting
+remains future material work; this is an illumination contract, not a material
+system.
+
+**D6. Structural manifest identity depended on the live viewport. REPAIRED.**
+Captures were planned from the browser surface aspect, and the camera solve
+fits the asset to that aspect, so camera pose, aspect, viewport and
+projectedBoundsOccupancy all moved when the window was resized — and all of
+them survived into the "structural" manifest.
+
+This is visible in this branch's own earlier evidence: identical MeshIR
+`1f3c73aa330cbe18` produced manifest hash `4aad7de3ff23fee9` at a 960x640
+capture and `2913d0deddc1406e` at 1680x1180. Those two hashes describe the same
+asset from the same source; they differed only because the window was a
+different size. Earlier iteration captures in §4 differ for the same reason.
+
+`structuralManifest` now excludes captures and measured performance entirely,
+and `structuralManifestHash` is the portable identity. CINDER's portable
+structural hash is **`01d15dea2c7f4f34`** at 960x640, 1680x1180, 540x1260 and
+in the browser at 1380x1131. `manifestHash` is unchanged in meaning: it hashes
+whatever manifest it is given, which for a full manifest is an *observation*.
 
 **D3. The top view is a 7%-wide sliver.** `projectedBoundsOccupancy` reports
 `w=0.0764, h=0.8696`. The framing is *correct* for a 10:1 asset, but the view
@@ -345,13 +412,25 @@ Ranked by evidence from this benchmark, not by general desirability.
    quality, but the largest scope.
 9. **Ear-clipping cap triangulation.** B5. Small, self-contained, removes
    manual decomposition of concave profiles.
-10. **Asset-relative canonical view naming.** D1. Small correction, prevents a
-    whole class of agent misreading.
+Items 1–9 are geometry, surface and runtime capabilities. The tenth finding of
+this benchmark — asset-relative canonical views — was an evidence-contract
+defect rather than a capability, and has been repaired rather than queued.
 
-**Explicitly not recommended by this evidence:** sweep, loft, subdivision and
-remesh. None of them was reached for during ten iterations, and the forms that
-would have used them (A3) were blocked by part count rather than by their
-absence.
+### Capabilities this benchmark did NOT earn
+
+**Sweep, loft, subdivision and remesh are not recommended as the NEXT
+capabilities by this evidence.** That is a statement about what CINDER proved,
+not a judgement about the operations. None was reached for across ten
+iterations, and the forms that would have used them (A3) were blocked by part
+count rather than by their absence — so this benchmark produced no evidence
+either way.
+
+They remain architecturally available and open to being earned by a later
+forcing asset. An environment, a character, a vehicle or a creature exercises
+very different form language from a hard-surface carbine, and any of them could
+produce exactly the evidence CINDER did not. The rule is that a capability
+enters the queue when a forcing asset demonstrates the need, and CINDER simply
+was not the asset that demonstrates these.
 
 ---
 
@@ -374,6 +453,13 @@ capture run. No `PREVIEW_DPR_CLAMPED`, no budget degradation, no merge
 warnings. The Preview Lab holds no idle animation frame after settling
 (`idleFrameScheduled: false`), and dispose is clean and idempotent.
 
-**Unresolved:** D1 (view naming) and D2 (fixed key light) are real findings
-against the harness that this tranche did not authorise changing. They are
-recorded here rather than fixed.
+**Resolved after this benchmark was first written:** D1 (asset-relative view
+naming), D2 (camera-relative inspection lighting) and D6 (portable structural
+manifest identity) were repaired following independent re-audit. CINDER's
+geometry was not changed to satisfy them; the improvement in `front`, `back`
+and `left` legibility is entirely a harness repair.
+
+**Still unresolved:** D3 (a 10:1 asset is a sliver in plan view), D4
+(projectedBoundsOccupancy cannot distinguish a full frame from a sparse one)
+and D5 (nothing measures legibility). These remain recorded rather than fixed,
+and no capability in §7 has been implemented.

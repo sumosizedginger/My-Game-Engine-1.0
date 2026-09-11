@@ -311,6 +311,19 @@ This is the seam that will eventually permit `character.hand.R -> weapon.grip.R`
 - `AssetPreviewManifest` canonical encoding must be byte identical;
 - bounds, statistics, part tables, and anchors must be identical.
 
+> **Clarified after independent re-audit.** Implementation showed that "the
+> manifest" is two things. Its capture records are an OBSERVATION — camera
+> pose, aspect, viewport — and the camera solve fits the asset to the live
+> viewport aspect, so a resized browser window changed those bytes. A UI
+> viewport is not asset identity.
+>
+> The strict contract above applies to **portable structural identity**:
+> `structuralManifest` / `structuralManifestHash`, which exclude captures and
+> measured performance. The full manifest remains byte identical for identical
+> source AND identical capture setup, and `manifestHash` is unchanged in
+> meaning. This is a clarification of what the decision always intended, not a
+> relaxation of it.
+
 **RENDERED IMAGE EVIDENCE: TOLERANCE-BASED.** Do **not** require cross-machine PNG byte identity. That is not a reliable portable graphics contract across GPU vendors, drivers, browser versions, renderer implementations, or color pipelines.
 
 Use tolerance-based visual comparison, with explicit recorded thresholds. Record enough capture metadata to make the evidence meaningful: engine revision, browser and version where available, renderer backend, viewport, DPR, camera transform, projection parameters, asset bounds, capture name.
@@ -674,7 +687,7 @@ CINDER must:
 - render in Preview Lab;
 - support all canonical views;
 - produce deterministic MeshIR encoding and hash;
-- produce a byte-identical canonical manifest across repeated clean runs;
+- produce a byte-identical portable structural manifest across repeated clean runs, and across differing viewport and aspect;
 - produce zero unresolved BLOCKING diagnostics;
 - stay within the declared preview safety budget;
 - cleanly dispose and recreate.

@@ -117,6 +117,9 @@ export async function renderCanonicalViews({
       meshHash: window.__PREVIEW_LAB__.meshHash,
       manifestHash: window.__PREVIEW_LAB__.manifestHash,
       manifestJson: window.__PREVIEW_LAB__.manifestJson,
+      // PORTABLE asset identity, free of camera pose, aspect and viewport.
+      structuralHash: window.__PREVIEW_LAB__.structuralHash,
+      structuralJson: window.__PREVIEW_LAB__.structuralJson,
       stats: window.__PREVIEW_LAB__.getStats(),
       parts: window.__PREVIEW_LAB__.getParts()
     }));
@@ -125,11 +128,19 @@ export async function renderCanonicalViews({
 
     const captures = [];
     for (const view of CANONICAL_VIEWS) {
-      const camera = await page.evaluate((v) => {
+      const viewState = await page.evaluate((v) => {
         window.__PREVIEW_LAB__.setView(v);
         const found = window.__PREVIEW_LAB__.manifest.captures.find((c) => c.name === v);
-        return found ?? null;
+        return {
+          camera: found ?? null,
+          // Illumination that produced these pixels. Camera-relative, so it
+          // legitimately differs per view; recorded so a reader can tell a dark
+          // asset from a dark view.
+          lighting: window.__PREVIEW_LAB__.getLighting(),
+          lightCount: window.__PREVIEW_LAB__.lightCount
+        };
       }, view);
+      const camera = viewState.camera;
 
       // Let the on-demand render settle. There is no persistent RAF loop, so a
       // scheduled frame must be allowed to run before the pixels are read.
@@ -157,6 +168,8 @@ export async function renderCanonicalViews({
         fovDeg: camera?.fovDeg ?? null,
         aspect: camera?.aspect ?? null,
         projectedBoundsOccupancy: camera?.projectedBoundsOccupancy ?? null,
+        lighting: viewState.lighting,
+        lightCount: viewState.lightCount,
         // The ACTUAL captured surface, in device pixels and CSS pixels.
         viewport: { width: decoded.width, height: decoded.height },
         surface: {
@@ -220,6 +233,8 @@ export async function renderCanonicalViews({
       meshHash: identity.meshHash,
       manifestHash: identity.manifestHash,
       manifestJson: identity.manifestJson,
+      structuralHash: identity.structuralHash,
+      structuralJson: identity.structuralJson,
       stats: identity.stats,
       parts: identity.parts,
       captures,
@@ -271,14 +286,40 @@ export async function renderCanonicalViews({
 export function compareCaptureReports(a, b, { thresholds = IMAGE_COMPARISON_DEFAULTS } = {}) {
   const findings = [];
 
+  // PORTABLE ASSET IDENTITY. These must match for the same asset on any
+  // machine, in any browser, at any window size.
   if (a.meshHash !== b.meshHash) {
     findings.push({ kind: 'STRICT', field: 'meshHash', a: a.meshHash, b: b.meshHash });
   }
-  if (a.manifestHash !== b.manifestHash) {
-    findings.push({ kind: 'STRICT', field: 'manifestHash', a: a.manifestHash, b: b.manifestHash });
+  if (a.structuralHash !== b.structuralHash) {
+    findings.push({ kind: 'STRICT', field: 'structuralHash', a: a.structuralHash, b: b.structuralHash });
   }
-  if (a.manifestJson !== b.manifestJson) {
-    findings.push({ kind: 'STRICT', field: 'manifestJson', a: 'differs', b: 'differs' });
+  if (a.structuralJson !== b.structuralJson) {
+    findings.push({ kind: 'STRICT', field: 'structuralJson', a: 'differs', b: 'differs' });
+  }
+
+  // OBSERVATION identity. The full manifest carries camera pose, aspect and
+  // viewport, which are properties of the capture setup rather than of the
+  // asset. Two runs under the SAME setup must still agree exactly, so a
+  // difference is reported — but as CAPTURE_DEPENDENT, because a difference
+  // here with matching structural hashes means the setup changed, not the
+  // asset. Treating it as a structural failure is what previously made a
+  // resized browser window look like a different asset.
+  const sameSetup =
+    a.environment?.surfaceWidth === b.environment?.surfaceWidth &&
+    a.environment?.surfaceHeight === b.environment?.surfaceHeight &&
+    a.environment?.effectiveDpr === b.environment?.effectiveDpr;
+
+  if (a.manifestHash !== b.manifestHash) {
+    findings.push({
+      kind: sameSetup ? 'STRICT' : 'CAPTURE_DEPENDENT',
+      field: 'manifestHash',
+      a: a.manifestHash,
+      b: b.manifestHash,
+      note: sameSetup
+        ? 'identical capture setup must reproduce the observation manifest exactly'
+        : 'capture setup differs; compare structuralHash for asset identity'
+    });
   }
 
   const imageComparisons = [];
@@ -308,7 +349,10 @@ export function compareCaptureReports(a, b, { thresholds = IMAGE_COMPARISON_DEFA
   }
 
   return {
-    structurallyIdentical: findings.length === 0,
+    // Asset identity, not observation identity: a CAPTURE_DEPENDENT finding
+    // does not make two runs structurally different.
+    structurallyIdentical: findings.every((f) => f.kind !== 'STRICT'),
+    sameCaptureSetup: sameSetup,
     findings,
     imageComparisons,
     imagesWithinThreshold: imageComparisons.every((c) => c.withinThreshold)

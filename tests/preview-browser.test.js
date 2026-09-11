@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer-core';
 import { createServer } from 'vite';
 import { findBrowserExecutable } from '../src/eval/browser.js';
-import { CANONICAL_VIEWS } from '../src/preview/views.js';
+import {
+  CANONICAL_VIEWS, INSPECTION_RIG, inspectionLightFrame, solveCanonicalView
+} from '../src/preview/views.js';
 import { buildCinder } from '../examples/authoring/cinder-mk1/build.js';
 import { meshHash, encodeMesh, bytesToHex } from '../src/geometry/mesh-codec.js';
 import { diffHexRanges } from '../src/eval/probe-cinder.js';
@@ -151,6 +153,93 @@ test('Preview Lab renders CINDER, honours canonical views, stays idle and dispos
         seen.push(state.position.join(','));
       }
       assert.equal(new Set(seen).size, CANONICAL_VIEWS.length, 'each canonical view must frame differently');
+    });
+
+    await t.test('switching canonical views re-aims the inspection rig without accumulating lights', async () => {
+      // The rig is camera-relative, so every canonical view must be lit
+      // comparably rather than half of them facing away from a fixed key.
+      // Re-aiming must MUTATE the existing lights: creating a light per view
+      // switch would leak GPU state and silently brighten the scene.
+      const baseline = await page.evaluate(() => window.__PREVIEW_LAB__.lightCount);
+      assert.ok(baseline > 0, 'the scene must actually be lit');
+
+      const perView = [];
+      for (const view of CANONICAL_VIEWS) {
+        perView.push(await page.evaluate((v) => {
+          window.__PREVIEW_LAB__.setView(v);
+          const lighting = window.__PREVIEW_LAB__.getLighting();
+          return {
+            view: v,
+            lightCount: window.__PREVIEW_LAB__.lightCount,
+            rigVersion: lighting.rigVersion,
+            cameraRelative: lighting.cameraRelative,
+            reportedView: lighting.view,
+            key: lighting.lights.find((l) => l.name === 'key').direction
+          };
+        }, view));
+      }
+
+      // Cycle twice: an accumulation bug shows up on the second pass.
+      for (const view of CANONICAL_VIEWS) {
+        await page.evaluate((v) => window.__PREVIEW_LAB__.setView(v), view);
+      }
+      const afterTwoCycles = await page.evaluate(() => window.__PREVIEW_LAB__.lightCount);
+      assert.equal(afterTwoCycles, baseline,
+        `light count grew from ${baseline} to ${afterTwoCycles} across view switches`);
+
+      for (const entry of perView) {
+        assert.equal(entry.lightCount, baseline, `${entry.view} changed the light count`);
+        assert.equal(entry.rigVersion, INSPECTION_RIG.version);
+        assert.equal(entry.cameraRelative, true);
+        assert.equal(entry.reportedView, entry.view);
+      }
+
+      // The key direction must actually MOVE with the view. Identical key
+      // directions across views would mean the rig is still world-fixed.
+      const keys = new Set(perView.map((e) => e.key.map((n) => n.toFixed(6)).join(',')));
+      assert.equal(keys.size, CANONICAL_VIEWS.length,
+        'the key light must re-aim for every canonical view');
+
+      // And it must agree with the pure solver the capture path uses.
+      for (const entry of perView) {
+        const camera = solveCanonicalView(entry.view, buildCinder().meshIR.bounds, {
+          aspect: 1, upAxis: '+Y', forwardAxis: '-Z'
+        });
+        const expected = inspectionLightFrame(camera).lights.find((l) => l.name === 'key').direction;
+        for (let i = 0; i < 3; i++) {
+          assert.ok(Math.abs(entry.key[i] - expected[i]) < 1e-9,
+            `${entry.view}: browser rig must match the shared solver`);
+        }
+      }
+    });
+
+    await t.test('portable structural identity ignores the live viewport', async () => {
+      // Resizing a browser window must not change what asset this is. The
+      // camera solve fits the viewport aspect, so the observation manifest
+      // legitimately moves; the structural hash must not.
+      const before = await page.evaluate(() => ({
+        structuralHash: window.__PREVIEW_LAB__.structuralHash,
+        manifestHash: window.__PREVIEW_LAB__.manifestHash,
+        surface: window.__PREVIEW_LAB__.lab.getSurfaceSize()
+      }));
+
+      await page.setViewport({ width: 700, height: 1100, deviceScaleFactor: 1 });
+      await page.evaluate(() => window.__PREVIEW_LAB__.lab.resize());
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+
+      const after = await page.evaluate(() => ({
+        structuralHash: window.__PREVIEW_LAB__.structuralHash,
+        surface: window.__PREVIEW_LAB__.lab.getSurfaceSize(),
+        meshHash: window.__PREVIEW_LAB__.meshHash
+      }));
+
+      assert.notDeepEqual(after.surface, before.surface, 'the surface must really have changed');
+      assert.equal(after.structuralHash, before.structuralHash,
+        'portable asset identity must not depend on the browser window');
+      assert.match(after.structuralHash, /^[0-9a-f]{16}$/);
+
+      await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 });
+      await page.evaluate(() => window.__PREVIEW_LAB__.lab.resize());
     });
 
     await t.test('an unknown view is refused rather than silently ignored', async () => {

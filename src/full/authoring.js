@@ -87,8 +87,15 @@ export {
 export {
   CANONICAL_VIEWS,
   CANONICAL_VIEW_DIRECTIONS,
+  CANONICAL_VIEW_UP,
+  AXIS_VECTORS,
+  semanticFrame,
+  resolveCanonicalViewDirections,
+  resolveCanonicalViewUps,
   solveCanonicalView,
-  solveAllCanonicalViews
+  solveAllCanonicalViews,
+  INSPECTION_RIG,
+  inspectionLightFrame
 } from '../preview/views.js';
 
 // Manifest.
@@ -98,7 +105,8 @@ export {
   planCanonicalCaptures,
   encodeManifest,
   manifestHash,
-  structuralManifest
+  structuralManifest,
+  structuralManifestHash
 } from '../preview/manifest.js';
 
 import { MESH_OP_DESCRIPTORS } from '../geometry/mesh-ops.js';

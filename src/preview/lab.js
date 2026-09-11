@@ -22,7 +22,10 @@ import {
   Scene, Color, PerspectiveCamera, WebGLRenderer,
   HemisphereLight, DirectionalLight, Vector3
 } from 'three';
-import { CANONICAL_VIEWS, solveCanonicalView, boundingRadius } from './views.js';
+import {
+  CANONICAL_VIEWS, solveCanonicalView, boundingRadius,
+  INSPECTION_RIG, inspectionLightFrame
+} from './views.js';
 import { PREVIEW_BUDGET_DEFAULTS, resolveDevicePixelRatio } from './budget.js';
 
 /**
@@ -109,12 +112,58 @@ export function createPreviewLab({
   renderer.domElement.style.display = 'block';
   container.appendChild(renderer.domElement);
 
-  const hemi = new HemisphereLight(0xdfe8ff, 0x30302c, 2.0);
-  const key = new DirectionalLight(0xffffff, 2.4);
-  key.position.set(3, 5, 4);
-  const fill = new DirectionalLight(0xaabbdd, 0.8);
-  fill.position.set(-4, 2, -3);
-  scene.add(hemi, key, fill, previewable.object3D);
+  // Inspection lighting is CAMERA-RELATIVE, not world-fixed.
+  //
+  // Fixed world lights at (3,5,4) and (-4,2,-3) meant a view facing toward the
+  // key returned bright evidence and a view facing away returned dark evidence,
+  // for the same asset. Half the canonical captures were systematically less
+  // legible than the other half and nothing in the manifest said so, which is a
+  // harness defect rather than a property of any asset.
+  //
+  // The rig is now defined in view space (see INSPECTION_RIG) and re-aimed
+  // whenever the canonical view changes. The light OBJECTS are created once
+  // here and only ever re-aimed, so switching views can never accumulate
+  // lights, and disposal has a fixed set to clean up.
+  const hemi = new HemisphereLight(
+    INSPECTION_RIG.hemisphere.sky,
+    INSPECTION_RIG.hemisphere.ground,
+    INSPECTION_RIG.hemisphere.intensity
+  );
+  const rigLights = INSPECTION_RIG.lights.map((spec) => {
+    const light = new DirectionalLight(spec.color, spec.intensity);
+    light.name = `inspection.${spec.name}`;
+    // A directional light aims at its target object. The asset centre is not
+    // the world origin, so the default target would skew every light.
+    light.target.position.set(...previewable.bounds.center);
+    return light;
+  });
+
+  scene.add(hemi, previewable.object3D);
+  for (const light of rigLights) scene.add(light, light.target);
+
+  /** Distance at which rig lights are parked. Directional, so only aim matters. */
+  const rigRadius = Math.max(boundingRadius(previewable.bounds) * 4, 1);
+
+  /**
+   * Re-aims the rig for a solved canonical camera.
+   *
+   * Mutates the existing lights; never creates or removes any.
+   *
+   * @param {object} cameraRecord
+   */
+  function aimInspectionLights(cameraRecord) {
+    const frame = inspectionLightFrame(cameraRecord);
+    const [cx, cy, cz] = previewable.bounds.center;
+    frame.lights.forEach((light, index) => {
+      const target = rigLights[index];
+      if (!target) return;
+      target.position.set(
+        cx + light.direction[0] * rigRadius,
+        cy + light.direction[1] * rigRadius,
+        cz + light.direction[2] * rigRadius
+      );
+    });
+  }
 
   let disposed = false;
   let frameRequested = false;
@@ -125,9 +174,17 @@ export function createPreviewLab({
   let lastFrameMs = null;
 
   const target = new Vector3(...previewable.bounds.center);
+  /** View options shared by every solve, so framing and axes never diverge. */
+  const viewOptions = () => ({
+    upAxis: previewable.mesh.upAxis,
+    forwardAxis: previewable.mesh.forwardAxis
+  });
+
   let baseCamera = solveCanonicalView(currentView, previewable.bounds, {
+    ...viewOptions(),
     aspect: width / height
   });
+  aimInspectionLights(baseCamera);
 
   /**
    * Positions the camera from the canonical solve plus orbit and zoom offsets.
@@ -218,7 +275,8 @@ export function createPreviewLab({
     const size = measureContainer();
     renderer.setSize(size.width, size.height);
     camera.aspect = size.width / size.height;
-    baseCamera = solveCanonicalView(currentView, previewable.bounds, { aspect: camera.aspect });
+    baseCamera = solveCanonicalView(currentView, previewable.bounds, { ...viewOptions(), aspect: camera.aspect });
+    aimInspectionLights(baseCamera);
     requestRender();
   };
 
@@ -251,7 +309,8 @@ export function createPreviewLab({
       orbitPitch = 0;
       zoomFactor = 1;
       const size = measureContainer();
-      baseCamera = solveCanonicalView(view, previewable.bounds, { aspect: size.width / size.height });
+      baseCamera = solveCanonicalView(view, previewable.bounds, { ...viewOptions(), aspect: size.width / size.height });
+      aimInspectionLights(baseCamera);
       requestRender();
     },
 
@@ -282,6 +341,42 @@ export function createPreviewLab({
 
     get currentView() {
       return currentView;
+    },
+
+    /**
+     * The illumination that produced the current frame.
+     *
+     * Recorded into capture evidence so another agent can tell whether a dark
+     * region is a dark asset or a dark view. `rigVersion` names the versioned
+     * Preview Lab illumination contract; the directions are that contract
+     * resolved for the active canonical camera.
+     *
+     * @returns {object}
+     */
+    getLighting() {
+      const frame = inspectionLightFrame(baseCamera);
+      return {
+        rigVersion: frame.version,
+        cameraRelative: true,
+        view: currentView,
+        hemisphere: { ...INSPECTION_RIG.hemisphere },
+        lights: frame.lights.map((light) => ({
+          name: light.name,
+          direction: [...light.direction],
+          color: light.color,
+          intensity: light.intensity
+        }))
+      };
+    },
+
+    /**
+     * Live count of lights in the scene. Switching canonical views re-aims the
+     * rig; it must never add to it.
+     *
+     * @returns {number}
+     */
+    get lightCount() {
+      return scene.children.filter((child) => child.isLight === true).length;
     },
 
     /**
@@ -365,8 +460,10 @@ export function createPreviewLab({
 
       scene.remove(previewable.object3D);
       hemi.dispose();
-      key.dispose();
-      fill.dispose();
+      for (const light of rigLights) {
+        scene.remove(light, light.target);
+        light.dispose();
+      }
       scene.clear();
       renderer.dispose();
       if (renderer.domElement.parentNode === container) {

@@ -61,10 +61,14 @@ const ALLOWED_FULL_ADDITIONS = new Set([
   'createPreviewable', 'previewArtifact', 'createPreviewLab',
   'PREVIEW_BUDGET_DEFAULTS', 'evaluatePreviewBudget', 'enforcePreviewBudget',
   // Canonical views: solver only.
-  'CANONICAL_VIEWS', 'CANONICAL_VIEW_DIRECTIONS', 'solveCanonicalView', 'solveAllCanonicalViews',
+  'CANONICAL_VIEWS', 'CANONICAL_VIEW_DIRECTIONS', 'CANONICAL_VIEW_UP', 'AXIS_VECTORS',
+  'semanticFrame', 'resolveCanonicalViewDirections', 'resolveCanonicalViewUps',
+  'solveCanonicalView', 'solveAllCanonicalViews',
+  // Versioned inspection illumination contract.
+  'INSPECTION_RIG', 'inspectionLightFrame',
   // Manifest.
   'MANIFEST_VERSION', 'createAssetPreviewManifest', 'planCanonicalCaptures',
-  'encodeManifest', 'manifestHash', 'structuralManifest',
+  'encodeManifest', 'manifestHash', 'structuralManifest', 'structuralManifestHash',
   // Discoverability.
   'AUTHORING_SURFACE'
 ]);
